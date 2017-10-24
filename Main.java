@@ -32,7 +32,8 @@ public class MainServer {
                     System.out.println(peerID + " " + hostname + " " + port);
 
                     //if(checkID != null && checkID.equals(tokens[0])){
-                        //create Peer object
+                        //create Peer object - need to create Peer class first
+                        Peer peer = new Peer(peerID, port, hasFile);
                         //connect peer by bootsrapping
                     //}
                 }
