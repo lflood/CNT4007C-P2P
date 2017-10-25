@@ -23,7 +23,7 @@ public class Peer {
 
         //create new server thread
 
-        //read and add file contents to peer variables
+        //read config file
         String str;
         String[] config = new String[6];
         try {
@@ -43,5 +43,17 @@ public class Peer {
             e.printStackTrace();
         }
 
+        //populate config values
+        if (config != null){
+            //experiment between using "this" or not since common config is common to all peers...
+            this.numberOfPreferredNeighbors = Integer.valueOf(config[0]);
+            this.unchokingInterval = Integer.valueOf(config[1]);
+            this.optimisticUnchokingInterval = Integer.valueOf(config[2]);
+            fileName = config[3];
+            fileSize = Integer.valueOf(config[4]);
+            pieceSize = Integer.valueOf(config[5]);
+
+            System.out.println(numberOfPreferredNeighbors + " " + unchokingInterval + " " + optimisticUnchokingInterval + " " + fileName + " " + fileSize + " " + pieceSize);
+        }
     }
 }
