@@ -4,15 +4,14 @@ import java.util.Hashtable;
 
 public class Main {
     public static void main(String[] args) {
-        //accepted peers are added to peerInfo hashTable
         Hashtable<Integer, String> peerInfo = new Hashtable<Integer, String>();
-        //String checkID = null;
-        /*if(args.length > 0) {
+        String checkID = null;
+        if(args.length > 0) {
             checkID = args[0];
         } else{
             System.out.println("Argument needed for peerID");
             return;
-        }*/
+        }
 
         //Read from peerInfo.cfg file and add the peers into hashtable
         //format:
@@ -27,18 +26,17 @@ public class Main {
                     String hostname = tokens[1];
                     int port = Integer.valueOf(tokens[2]);
                     boolean hasFile = false;
+                    peerInfo.put(peerID, hostname + ":" + port);
                     if(tokens[3].equals("1")) {
                         hasFile = true;
                     }
-                    System.out.println(peerID + " " + hostname + " " + port);
 
-                    peerInfo.put(peerID, hostname + ":" + port);
-                    System.out.println("peerInfo is: " + peerInfo);
-                    //if(checkID != null && checkID.equals(tokens[0])){
-                        //create Peer object - need to create Peer class first
-                        Peer peer = new Peer(peerID, port, hasFile);
-                        //connect peer by bootsrapping
-                    //}
+                    if(checkID != null && checkID.equals(tokens[0])){
+                    	Peer peer = new Peer(peerID, port, hasFile, peerInfo);
+                    	//peerInfo contains peerID, hostname, and port
+                    	//could potentially create validity tests for comparison
+                    }
+                    
                 }
                 line.close();
             }
