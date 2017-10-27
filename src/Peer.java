@@ -19,6 +19,7 @@ public class Peer {
     private int numberOfExpectedPeers;
 
     //Common.cfg contents
+
     static int numberOfPreferredNeighbors;
     static int unchokingInterval;
     static int optimisticUnchokingInterval;
@@ -27,11 +28,13 @@ public class Peer {
     static int pieceSize;
 
     public Peer(int peerid, int port, boolean hasFile, Hashtable<Integer, String> peerInfo, int targNum) throws IOException, InterruptedException {
-        this.peerid = peerid;
+      this.peerid = peerid;
         numberOfExpectedPeers = targNum-1;
         //create peer_ID files
         new File("peer_" + peerid).mkdir();
-       
+
+
+      
         //read and add file contents to peer variables
         String str;
         String[] config = new String[6];
@@ -81,12 +84,12 @@ public class Peer {
         {
         	CH.get(i).join();
         }
-
     }
    
 /////////////////////////////
     
     private static class ServerHandler extends Thread 
+
     {
     	ArrayList<RequestHandler> RH = new ArrayList<RequestHandler>(peerid-1001);
         int port;
@@ -214,5 +217,4 @@ public class Peer {
         
     }
 
-   ///////////////////////
-}
+    }

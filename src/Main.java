@@ -34,6 +34,7 @@ public class Main {
                         hasFile = true;
                     }
 
+
                     if(checkID != null && checkID.equals(tokens[0]))
                     {
                     	portPass = port;
@@ -53,6 +54,8 @@ public class Main {
                 line.close();  
                            
                 
+
+
             }
             catch(Exception e) {
                 e.printStackTrace();
