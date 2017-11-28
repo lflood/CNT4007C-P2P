@@ -1,8 +1,7 @@
-package src;
-
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Hashtable;
 
@@ -114,29 +113,10 @@ public class Peer {
                     while(numConn < expectedClients) 
                     {
                     	Socket accepted = listener.accept();
-                        RH.add(new RequestHandler(accepted));
+                        RH.add(new RequestHandler(accepted));   //add the flag bit indicating whether they shook hands or not
                         RH.get(numConn).start();
                         numConn++;
                 		System.out.println("Client is connected!");
-
-                		// ACCEPT HANDSHAKE
-                		// Move to separate handler later
-                        HandShakeMessage hShkMsg = new HandShakeMessage();
-                        DataInputStream dIn = new DataInputStream(accepted.getInputStream());
-
-                        int length = dIn.readInt();
-                        if(length > 0) {
-
-                            byte[] message = new byte[length];
-                            dIn.readFully(message, 0, message.length); // read the message
-
-                            if(hShkMsg.accept(message)){ // RESPOND
-                                byte[] response = hShkMsg.getByteMessage(hShkHeader, peerid);
-                                DataOutputStream dOut = new DataOutputStream(accepted.getOutputStream());
-                                dOut.writeInt(response.length); // write length of the message
-                                dOut.write(response);           // write the message
-                            }
-                        }
 
                     }
                    
@@ -175,9 +155,48 @@ public class Peer {
         
         public void run() 
         {
-            try
-            {
-            		
+            try {
+
+                HandShakeMessage hMsg = new HandShakeMessage();
+                //Utility.SendMsg(mySocket,Msg)//synchronized on the socket level so that only one can write to the socket at the same time
+
+                // SEND HANDSHAKE
+                byte[] handshake = hMsg.getByteMessage(hShkHeader, peerid);
+
+                DataOutputStream dOut = new DataOutputStream(connection.getOutputStream());
+
+                dOut.writeInt(handshake.length); // write length of the message
+                dOut.write(handshake);           // write the message
+
+                // RECEIVE HANDSHAKE
+                DataInputStream dIn = new DataInputStream(connection.getInputStream());
+
+                int length = dIn.readInt();
+                if (length > 0) {
+
+                    byte[] message = new byte[length];
+                    dIn.readFully(message, 0, message.length); // read the message
+
+                    hMsg.accept(message);
+
+                }
+                //start while loop for receiving messages
+                //have a separate thread to send message that dies
+
+                while(true){ //have a better termination condition!
+                    int message_length = dIn.readInt();
+                    byte message_type = dIn.readByte();
+                    switch(message_type){
+                        case 0:
+                            byte[] message_payload = new byte[message_length-1];
+                            dIn.readFully(message_payload);
+                            //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
+                            break;
+                        case 1:
+                            break;
+
+                    }
+                }
             }
             catch(Exception ioException)
             {
@@ -188,6 +207,8 @@ public class Peer {
 
             }
         }
+
+        //case functions
     }
     
 ///////////////////////////
@@ -214,29 +235,7 @@ public class Peer {
    	 			String hostname = address.split(":")[0];
    	            int port = Integer.parseInt(address.split(":")[1]);
    	    		requestSocket = new Socket(hostname, port);
-   	    		
-                HandShakeMessage hMsg = new HandShakeMessage();
-                //Utility.SendMsg(mySocket,Msg)//synchronized on the socket level so that only one can write to the socket at the same time
-
-                // SEND HANDSHAKE
-                byte[] handshake = hMsg.getByteMessage(hShkHeader, peerid);
-
-                DataOutputStream dOut = new DataOutputStream(requestSocket.getOutputStream());
-
-                dOut.writeInt(handshake.length); // write length of the message
-                dOut.write(handshake);           // write the message
-
-                // RECEIVE HANDSHAKE
-                DataInputStream dIn = new DataInputStream(requestSocket.getInputStream());
-
-                int length = dIn.readInt();
-                if(length > 0) {
-
-                    byte[] message = new byte[length];
-                    dIn.readFully(message, 0, message.length); // read the message
-
-                    hMsg.accept(message);
-                }
+   	    		//socket connected
 
                 RequestHandler RH = new RequestHandler(requestSocket);
                 RH.run(); // run instead of start so that it it doesn't run on a separate thread!
