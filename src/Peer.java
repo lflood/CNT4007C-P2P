@@ -85,10 +85,10 @@ public class Peer {
    
 /////////////////////////////
     
-    private static class ServerHandler extends Thread 
+    private static class ServerHandler extends Thread
 
     {
-    	ArrayList<RequestHandler> RH = new ArrayList<RequestHandler>(peerid-1001);
+    	ArrayList<ServerRequestHandler> RH = new ArrayList<ServerRequestHandler>(peerid-1001);
         int port;
         int numConn = 0;
         int expectedClients;
@@ -113,7 +113,7 @@ public class Peer {
                     while(numConn < expectedClients) 
                     {
                     	Socket accepted = listener.accept();
-                        RH.add(new RequestHandler(accepted));   //add the flag bit indicating whether they shook hands or not
+                        RH.add(new ServerRequestHandler(accepted));   //add the flag bit indicating whether they shook hands or not
                         RH.get(numConn).start();
                         numConn++;
                 		System.out.println("Client is connected!");
@@ -142,18 +142,18 @@ public class Peer {
     
 /////////////////////////////
     
-    private static class RequestHandler extends Thread //rename to request handler
+    private static class ServerRequestHandler extends Thread //rename to request handler
     {
         private Socket connection;
         private ObjectInputStream in;   //stream read from the socket
         private ObjectOutputStream out;    //stream write to the socket
 
-        public RequestHandler(Socket connection)
+        public ServerRequestHandler(Socket connection)
         {
                     this.connection = connection;
         }
-        
-        public void run() 
+
+        public void run()
         {
             try {
 
@@ -200,7 +200,7 @@ public class Peer {
             }
             catch(Exception ioException)
             {
-                
+
             }
             finally
             {
@@ -210,9 +210,89 @@ public class Peer {
 
         //case functions
     }
-    
+
 ///////////////////////////
-    
+
+    private static class ClientRequestHandler extends Thread //rename to request handler
+    {
+        private Socket connection;
+        private int serverID;
+        private ObjectInputStream in;   //stream read from the socket
+        private ObjectOutputStream out;    //stream write to the socket
+
+        public ClientRequestHandler(Socket connection, int serverID)
+        {
+            this.connection = connection;
+            this.serverID = serverID;
+        }
+
+        public void run()
+        {
+            try {
+
+                HandShakeMessage hMsg = new HandShakeMessage();
+                //Utility.SendMsg(mySocket,Msg)//synchronized on the socket level so that only one can write to the socket at the same time
+
+                // SEND HANDSHAKE
+                byte[] handshake = hMsg.getByteMessage(hShkHeader, peerid);
+
+                DataOutputStream dOut = new DataOutputStream(connection.getOutputStream());
+
+                dOut.writeInt(handshake.length); // write length of the message
+                dOut.write(handshake);           // write the message
+
+                // RECEIVE HANDSHAKE
+                DataInputStream dIn = new DataInputStream(connection.getInputStream());
+
+                int length = dIn.readInt();
+                if (length > 0) {
+
+                    byte[] message = new byte[length];
+                    dIn.readFully(message, 0, message.length); // read the message
+
+                    int recepientID = hMsg.accept(message);
+
+                    if(serverID != recepientID){
+
+                        System.out.println("Error: incorrect peerID");
+                        // exit thread, connection incorrect
+                    }
+                }
+                //start while loop for receiving messages
+                //have a separate thread to send message that dies
+
+                while(true){ //have a better termination condition!
+                    int message_length = dIn.readInt();
+                    byte message_type = dIn.readByte();
+                    switch(message_type){
+                        case 0:
+                            byte[] message_payload = new byte[message_length-1];
+                            dIn.readFully(message_payload);
+                            //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
+                            break;
+                        case 1:
+                            break;
+
+                    }
+                }
+            }
+            catch(Exception ioException)
+            {
+
+            }
+            finally
+            {
+
+            }
+        }
+
+        //case functions
+    }
+
+
+    /////////////////////////////
+
+
     private static class ClientHandler extends Thread 
     {
         //ASSUME YOU HAVE THE INFORMATION YOU NEED (IP , ID , PORT , ETC including the socket.)
@@ -237,7 +317,7 @@ public class Peer {
    	    		requestSocket = new Socket(hostname, port);
    	    		//socket connected
 
-                RequestHandler RH = new RequestHandler(requestSocket);
+                ClientRequestHandler RH = new ClientRequestHandler(requestSocket, pReq);
                 RH.run(); // run instead of start so that it it doesn't run on a separate thread!
 
             }

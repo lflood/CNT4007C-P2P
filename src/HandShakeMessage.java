@@ -5,11 +5,11 @@ import java.util.Arrays;
 
 public class HandShakeMessage {
 
-
+	private String expectedHeader;
 
 	public HandShakeMessage() {
 
-
+		expectedHeader = "P2PFILESHARINGPROJ";
 	}
 
 	public byte[] getByteMessage(String header, int id){
@@ -34,7 +34,7 @@ public class HandShakeMessage {
 		return result;
 	}
 
-	public boolean accept(byte[] message){
+	public int accept(byte[] message){
 
 		byte[] headerBytes = Arrays.copyOfRange(message, 0, 18);
 		byte[] zeroBytes = Arrays.copyOfRange(message, 18, 28);
@@ -46,8 +46,15 @@ public class HandShakeMessage {
 		// Still needs to check validity, but shows P2P communication
 		String header = new String(headerBytes);
 
+		if(!header.equals(expectedHeader)){
+
+			System.out.println(header + " " + expectedHeader);
+			System.out.println("Error: wrong header received");
+			return -1;
+		}
+
 		System.out.println("Peer " + peerid + " is sending handshake message.");
 
-		return true;
+		return peerid;
 	}
 }
