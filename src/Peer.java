@@ -14,6 +14,8 @@ public class Peer {
     private int numberOfFilePieces;
     private int numberOfExpectedPeers;
 
+    private ArrayList<Peer> neighbors;
+
     //Common.cfg contents
 
     static int numberOfPreferredNeighbors;
@@ -28,9 +30,11 @@ public class Peer {
         this.peerid = peerid;
         hShkHeader = "P2PFILESHARINGPROJ";
         numberOfExpectedPeers = targNum-1;
+
+        neighbors = new ArrayList<>();
+
         //create peer_ID files
         new File("peer_" + peerid).mkdir();
-
 
         //read and add file contents to peer variables
         String str;

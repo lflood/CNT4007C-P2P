@@ -10,7 +10,7 @@ public class Message {
 
 	public byte[] getChokeMessage(){
 
-		int messageLength = 2;
+		int messageLength = 1;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(0).array();
 		byte[] lengthBytes = ByteBuffer.allocate(2).putInt(messageLength).array();
@@ -31,7 +31,7 @@ public class Message {
 
 	public byte[] getUnchokeMessage(){
 
-		int messageLength = 2;
+		int messageLength = 1;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(1).array();
 		byte[] lengthBytes = ByteBuffer.allocate(2).putInt(messageLength).array();
@@ -52,7 +52,7 @@ public class Message {
 
 	public byte[] getInterestedMessage(){
 
-		int messageLength = 2;
+		int messageLength = 1;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(2).array();
 		byte[] lengthBytes = ByteBuffer.allocate(2).putInt(messageLength).array();
@@ -73,7 +73,7 @@ public class Message {
 
 	public byte[] getNotInterestedMessage(){
 
-		int messageLength = 2;
+		int messageLength = 1;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(3).array();
 		byte[] lengthBytes = ByteBuffer.allocate(2).putInt(messageLength).array();
