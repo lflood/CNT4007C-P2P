@@ -3,13 +3,13 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Hashtable;
 
 
 
 public class Peer {
     //private variables so it can only be accessed within this class
-    private byte[] bitfield;
     private static int peerid;
     private int numberOfFilePieces;
     private int numberOfExpectedPeers;
@@ -27,12 +27,15 @@ public class Peer {
     static int pieceSize;
     static String hShkHeader;
 
+    private BitSet bitfield = new BitSet();
+
+
     public Peer(int peerid, int port, boolean hasFile, Hashtable<Integer, String> peerInfo, int targNum) throws IOException, InterruptedException {
         this.peerid = peerid;
         hShkHeader = "P2PFILESHARINGPROJ";
         numberOfExpectedPeers = targNum-1;
 
-        messageHandler = new Message();
+
         remotePeers = new Hashtable<>();
 
         //create peer_ID files
@@ -60,9 +63,10 @@ public class Peer {
             fileName = config[3];
             fileSize = Integer.parseInt(config[4]);
             pieceSize = Integer.parseInt(config[5]);
+            int numPieces = (int)Math.ceil(fileSize / (pieceSize * 1.0));
+            messageHandler = new Message(numPieces);
+            // TODO set to actual bitfield
 
-            bitfield = new byte [10]; // TODO set to actual bitfield
-            
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -204,22 +208,43 @@ public class Peer {
                 //start while loop for receiving messages
                 //have a separate thread to send message that dies
 
-                RemotePeer neighbor;
+                RemotePeer neighbor = remotePeers.get(clientID);
+                int index;
 
                 while(true){ //have a better termination condition!
                     int message_length = dIn.readInt();
                     System.out.println(message_length);
                     byte message_type = dIn.readByte();
                     System.out.println(message_type);
+                    byte[] message_payload;
                     switch(message_type){
+                       // case 0:
+                         //   byte[] message_payload = new byte[message_length-1];
+                           // dIn.readFully(message_payload);
+                            //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
+
                         case 0:
-                            byte[] message_payload = new byte[message_length-1];
-                            dIn.readFully(message_payload);
+                            chokeNeighbor(clientID);
                             //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
                             break;
+
                         case 1:
+                            unchokeNeighbor(clientID);
                             break;
 
+                        case 2:
+                            interested(clientID);
+                            break;
+
+                        case 3:
+                            notInterested(clientID);
+                            break;
+
+                        case 4:
+                            index = dIn.readInt();
+
+                            neighbor.updateBitfield(index);
+                            break;
                         case 5:
                             message_payload = new byte[message_length-1];
                             dIn.readFully(message_payload);
@@ -228,6 +253,25 @@ public class Peer {
 
                             neighbor.initializeBitfield(message_payload);
                             System.out.println("bitfield message received");
+                            break;
+                        case 6:
+                            index = dIn.readInt();
+
+                            byte[] piece = getPiece(index);
+
+                            byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
+
+                            dOut.write(pieceMsg);
+                            break;
+
+                        case 7:
+                            index = dIn.readInt();
+
+                            message_payload = new byte[message_length-5];
+                            dIn.readFully(message_payload);
+
+                            addPiece(index, message_payload);
+
                             break;
                     }
                 }
@@ -243,6 +287,44 @@ public class Peer {
         }
 
         //case functions
+        //case functions
+        public void chokeNeighbor(int peerid){
+            RemotePeer neighbor = remotePeers.get(peerid);
+            neighbor.choke();
+        }
+
+        public void unchokeNeighbor(int peerid){
+            RemotePeer neighbor = remotePeers.get(peerid);
+            neighbor.unchoke();
+        }
+
+        public void interested(int peerid){
+            RemotePeer neighbor = remotePeers.get(peerid);
+            neighbor.setInterested();
+        }
+
+        public void notInterested(int peerid){
+            RemotePeer neighbor = remotePeers.get(peerid);
+            neighbor.setNotInterested();
+        }
+
+        public boolean bitfieldIsEmpty(){
+            if(bitfield == null){
+                return true;
+            }else{
+                return false;
+            }
+        }
+
+        // TODO
+        public byte[] getPiece(int index){
+            return new byte [10];
+        }
+
+        // TODO
+        public void addPiece(int index, byte[] piece){
+
+        }
     }
 
 ///////////////////////////
@@ -380,6 +462,43 @@ public class Peer {
         }
 
         //case functions
+        public void chokeNeighbor(int peerid){
+            RemotePeer neighbor = remotePeers.get(peerid);
+            neighbor.choke();
+        }
+
+        public void unchokeNeighbor(int peerid){
+            RemotePeer neighbor = remotePeers.get(peerid);
+            neighbor.unchoke();
+        }
+
+        public void interested(int peerid){
+            RemotePeer neighbor = remotePeers.get(peerid);
+            neighbor.setInterested();
+        }
+
+        public void notInterested(int peerid){
+            RemotePeer neighbor = remotePeers.get(peerid);
+            neighbor.setNotInterested();
+        }
+
+        public boolean bitfieldIsEmpty(){
+            if(bitfield == null){
+                return true;
+            }else{
+                return false;
+            }
+        }
+
+        // TODO
+        public byte[] getPiece(int index){
+            return new byte [10];
+        }
+
+        // TODO
+        public void addPiece(int index, byte[] piece){
+
+        }
     }
 
 
@@ -425,41 +544,4 @@ public class Peer {
 
     }
 
-    public void chokeNeighbor(int peerid){
-        RemotePeer neighbor = remotePeers.get(peerid);
-        neighbor.choke();
-    }
-
-    public void unchokeNeighbor(int peerid){
-        RemotePeer neighbor = remotePeers.get(peerid);
-        neighbor.unchoke();
-    }
-
-    public void interested(int peerid){
-        RemotePeer neighbor = remotePeers.get(peerid);
-        neighbor.setInterested();
-    }
-
-    public void notInterested(int peerid){
-        RemotePeer neighbor = remotePeers.get(peerid);
-        neighbor.setNotInterested();
-    }
-
-    public boolean bitfieldIsEmpty(){
-        if(bitfield == null){
-            return true;
-        }else{
-            return false;
-        }
-    }
-
-    // TODO
-    public byte[] getPiece(int index){
-        return new byte [10];
-    }
-
-    // TODO
-    public void addPiece(int index, byte[] piece){
-
-    }
 }

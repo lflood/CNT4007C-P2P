@@ -1,11 +1,13 @@
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.BitSet;
 
 public class Message {
 
-	public Message() {
-
+	int bitfieldSize;
+	public Message(int bitfieldSize) {
+		this.bitfieldSize = bitfieldSize;
 	}
 
 	public byte[] getChokeMessage(){
@@ -115,12 +117,11 @@ public class Message {
 		return result;
 	}
 
-	public byte[] getBitfieldMessage(byte[] bitfield){
+	public byte[] getBitfieldMessage(BitSet bitfield){
 
 		System.out.println("getBitfieldMessage()");
 
-		int messageLength = bitfield.length + 1;
-
+		int messageLength = bitfieldSize + 1;
 		byte typeBytes = 5;
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
@@ -129,7 +130,7 @@ public class Message {
 		try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
 			outputStream.write(lengthBytes);
 			outputStream.write(typeBytes);
-			outputStream.write(bitfield);
+			outputStream.write(bitfield.toByteArray());
 
 			result = outputStream.toByteArray();
 		} catch (IOException ie){
