@@ -117,11 +117,12 @@ public class Message {
 
 	public byte[] getBitfieldMessage(byte[] bitfield){
 
+		System.out.println("getBitfieldMessage()");
+
 		int messageLength = bitfield.length + 1;
 
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(5).array();
-		byte[] lengthBytes = ByteBuffer.allocate(1).putInt(messageLength).array();
-
+		byte typeBytes = 5;
+		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
 
@@ -161,14 +162,14 @@ public class Message {
 		return result;
 	}
 
-	public byte[] getPieceMessage(byte[] index, byte[] content){
+	public byte[] getPieceMessage(int index, byte[] piece){
 
 		int messageLength = 5;
 
+		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(7).array();
-		byte[] lengthBytes = ByteBuffer.allocate(1).putInt(messageLength).array();
-		byte[] indexBytes = index; // TODO MAKE LEGIT
-		byte[] contentBytes = content;
+		byte[] indexBytes = ByteBuffer.allocate(4).putInt(index).array();
+		byte[] contentBytes = piece;
 
 		byte[] result = null;
 
