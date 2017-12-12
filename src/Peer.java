@@ -65,6 +65,12 @@ public class Peer {
             pieceSize = Integer.parseInt(config[5]);
             int numPieces = (int)Math.ceil(fileSize / (pieceSize * 1.0));
             messageHandler = new Message(numPieces);
+            if(hasFile){
+                bitfield.set(0, numPieces);
+            } else{
+                bitfield.clear(0);
+            }
+
             // TODO set to actual bitfield
 
         } catch (Exception e) {

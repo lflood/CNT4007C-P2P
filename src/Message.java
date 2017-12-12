@@ -7,7 +7,8 @@ public class Message {
 
 	int bitfieldSize;
 	public Message(int bitfieldSize) {
-		this.bitfieldSize = bitfieldSize;
+		this.bitfieldSize = (int)Math.ceil(bitfieldSize/8);
+
 	}
 
 	public byte[] getChokeMessage(){

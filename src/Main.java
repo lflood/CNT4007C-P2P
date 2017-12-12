@@ -50,7 +50,7 @@ public class Main {
                     	//peerInfo contains peerID, hostname, and port
                     	//could potentially create validity tests for comparison
                     	//hash map is only as long as the while loop so far. Sorry for the terrible comment. 
-                    }
+                }
                 
                 Peer peer = new Peer(peerIDPass, portPass, hasFilePass, peerInfo, counter);
                 line.close();  
