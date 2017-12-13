@@ -4,13 +4,29 @@ import java.nio.ByteBuffer;
 import java.util.BitSet;
 
 public class Message {
-
 	int bitfieldSize;
+	String peer;
+	int payLoadLength;
+	int type;
+	byte [] payload;
+
+
 	public Message(int bitfieldSize) {
 		this.bitfieldSize = (int)Math.ceil(bitfieldSize/8);
-
 	}
-
+	//have, bitfield, request, and piece message constructor
+	public Message(String peer, int payLoadLength, int type, byte [] payload){
+		this.peer = peer;
+		this.payLoadLength = payLoadLength;
+		this.type = type;
+		this.payload = payload;
+	}
+	//choke, unchoke, interested, not interested message constructor
+	public Message(String peer, int payLoadLength, int type){
+		this.peer = peer;
+		this.payLoadLength = payLoadLength;
+		this.type = type;
+	}
 	public byte[] getChokeMessage(){
 
 		int messageLength = 1;

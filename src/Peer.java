@@ -136,6 +136,7 @@ public class Peer {
                         numConn++;
                 		System.out.println("Client is connected!");
 
+
                     }
                    
                         
@@ -202,7 +203,7 @@ public class Peer {
 
                 // add newly connected peer to RemotePeers
                 if(!bitfieldIsEmpty()) {
-
+                    System.out.println(bitfieldIsEmpty());
                     byte[] msg = messageHandler.getBitfieldMessage(bitfield);
 
                     dOut.write(msg);           // write the message
@@ -373,6 +374,8 @@ public class Peer {
                     dIn.readFully(handshake, 0, handshake.length); // read the message
 
                     int recepientID = hMsg.accept(handshake);
+                    Log.madetcpConnection(peerid, recepientID);
+                    Log.accepttcpConnection(recepientID, peerid);
 
                     if(serverID != recepientID){
 

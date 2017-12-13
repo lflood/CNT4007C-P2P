@@ -5,11 +5,22 @@ import java.io.PrintWriter;
 import java.util.Date;
 
 public class Log {
-    public static void tcpConnection(int peerid, int remote_peerid){
+    public static void madetcpConnection(int peerid, int remote_peerid) throws IOException{
         Date date = new Date();
-        String logger = date.toString() + ": Peer " + peerid + "has made a connection to peer " + "remote_peerid" + ".\n";
+        String logger = date.toString() + ": Peer " + peerid + " has made a connection to peer " + remote_peerid + ".\n";
         saveLog(peerid, logger);
     }
+    public static void accepttcpConnection(int peerid, int remote_peerid) throws IOException{
+        Date date = new Date();
+        String logger = date.toString() + ": Peer " + peerid + " is connected from peer " + remote_peerid + ".\n";
+        saveLog(peerid, logger);
+    }
+    public static void preferredNeighbors() throws IOException{
+        Date date = new Date();
+       // String logger = date.toString() + ": Peer " + peerid + " is connected from peer " + remote_peerid + ".\n";
+       // saveLog(peerid, logger);
+    }
+
 
     public static void saveLog(int peerid, String text){
         System.out.println(text);
