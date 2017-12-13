@@ -29,11 +29,17 @@ public class RemotePeer {
     public boolean checkInterested(){
         return interested;
     }
+
+
     public byte [] getBitfield(){
-        return bitfield;
+        synchronized (this) {
+            return bitfield;
+        }
     }
-
-
+    public void updateBitfield(byte [] bitfield){
+        this.bitfield = bitfield;
+        // set index location to having a piece
+    }
     public void initializeBitfield(byte[] bitfield){
 
         if(!bitfieldInitialized) {
@@ -96,8 +102,4 @@ public class RemotePeer {
         interested = false;
     }
 
-    public void updateBitfield(int index){
-
-        // set index location to having a piece
-    }
 }

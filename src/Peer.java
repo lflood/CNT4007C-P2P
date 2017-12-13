@@ -11,10 +11,18 @@ import java.util.Hashtable;
 
 public class Peer {
     //private variables so it can only be accessed within this class
-    private static int peerid;
+    //made them public so I could use the variables in FileHandling
+    //might need to change this implementation
+    static int peerid;
+    static int port;
+    static boolean hasFile;
+    static Hashtable<Integer, String> peerInfo;
+    static int targNum;
+
     private int numberOfFilePieces;
     private int numberOfExpectedPeers;
     private Message messageHandler;
+
 
     private Hashtable<Integer, RemotePeer> remotePeers;
 
@@ -26,6 +34,7 @@ public class Peer {
     static String fileName;
     static int fileSize;
     static int pieceSize;
+    static int numPieces;
     static String hShkHeader;
 
     private BitSet bitfield = new BitSet();
@@ -33,9 +42,22 @@ public class Peer {
     private HashSet<Integer> chokeMe = new HashSet<>();
     private HashSet<Integer> interested = new HashSet<>();
 
+    /*should we have something like this below??
+
+    private static int port;
+    private static boolean hasFile;
+    private static int
+    public static final Peer peer = new peer(peerid, port, hasFile, peerInfo, counter);
+    public static Peer getPeer() {return peer}
+    */
 
     public Peer(int peerid, int port, boolean hasFile, Hashtable<Integer, String> peerInfo, int targNum) throws IOException, InterruptedException {
         this.peerid = peerid;
+        this.port = port;
+        this.hasFile = hasFile;
+        this.peerInfo = peerInfo;
+        this.targNum = targNum;
+
         hShkHeader = "P2PFILESHARINGPROJ";
         numberOfExpectedPeers = targNum-1;
 
@@ -67,7 +89,7 @@ public class Peer {
             fileName = config[3];
             fileSize = Integer.parseInt(config[4]);
             pieceSize = Integer.parseInt(config[5]);
-            int numPieces = (int)Math.ceil(fileSize / (pieceSize * 1.0));
+            numPieces = (int)Math.ceil(fileSize / (pieceSize * 1.0));
             messageHandler = new Message(numPieces);
             if(hasFile){
                 bitfield.set(0, numPieces);
@@ -254,7 +276,7 @@ public class Peer {
                         case 4:
                             index = dIn.readInt();
 
-                            neighbor.updateBitfield(index);
+                            //neighbor.updateBitfield(index);
                             break;
                         case 5:
                             message_payload = new byte[message_length-1];
@@ -439,7 +461,7 @@ public class Peer {
                         case 4:
                             index = dIn.readInt();
 
-                            neighbor.updateBitfield(index);
+                            //neighbor.updateBitfield(bitfield);
                             break;
                         case 5:
                             message_payload = new byte[message_length-1];
