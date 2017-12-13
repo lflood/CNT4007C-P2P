@@ -27,6 +27,18 @@ public class Message {
 		this.payLoadLength = payLoadLength;
 		this.type = type;
 	}
+
+	public String getPeerID(){
+		return peer;
+	}
+	public int getPayLoadLength(){
+		return payLoadLength;
+	}
+	public int getType(){
+		return type;
+	}
+
+
 	public byte[] getChokeMessage(){
 
 		int messageLength = 1;

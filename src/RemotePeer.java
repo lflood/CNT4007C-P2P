@@ -11,6 +11,7 @@ public class RemotePeer {
     private boolean interested;
     private boolean bitfieldInitialized;
 
+    //might want to pass in port maybe
     public RemotePeer(int ID) {
 
         this.ID = ID;
@@ -19,6 +20,19 @@ public class RemotePeer {
         this.bitfield = null;
         bitfieldInitialized = false;
     }
+    public int getID(){
+        return ID;
+    }
+    public boolean checkChoke(){
+        return choked;
+    }
+    public boolean checkInterested(){
+        return interested;
+    }
+    public byte [] getBitfield(){
+        return bitfield;
+    }
+
 
     public void initializeBitfield(byte[] bitfield){
 
