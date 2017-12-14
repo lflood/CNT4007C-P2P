@@ -296,10 +296,10 @@ public class Peer {
                     switch(message_type){
                         //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
                         case 2:
-                            interested(peerid, clientID);
+                            interestedMe(peerid, clientID);
                             break;
                         case 3:
-                            notInterested(peerid, clientID);
+                            notInterestedMe(peerid, clientID);
                             break;
                         case 5:
                             message_payload = new byte[message_length - 1];
@@ -316,6 +316,9 @@ public class Peer {
                             // if client not choked, send piece
                             //TODO add check for choked
                             if(!neighbor.isChoked()){
+                                //check if neighbor is preferred
+                                //check if optimistically unchoked neighbor changed
+                                //because peer might've
                                 byte[] piece = getPiece(index);
                                 //we parse the data into the pieceMsg format
                                 byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
@@ -337,18 +340,19 @@ public class Peer {
         }
 
         //case functions
-        public void interested(int peerid, int neighborID){
-            RemotePeer neighbor = remotePeers.get(peerid);
-            neighbor.setInterested();
+        public void interestedMe(int neighborID, int peerid){
+            RemotePeer neighbor = remotePeers.get(neighborID);
+            neighbor.isInterestedMe();
+            //the neighbor that choked us will now save that we are choked
             try{
-                Log.interested(peerid, neighborID);
-            }catch(IOException e) {
+                Log.choking(peerid, neighborID);
+            }catch(IOException e){
                 System.out.println(e.toString());
             }
         }
-        public void notInterested(int peerid, int neighborID) {
-            RemotePeer neighbor = remotePeers.get(peerid);
-            neighbor.setNotInterested();
+        public void notInterestedMe(int neighborID, int peerid) {
+            RemotePeer neighbor = remotePeers.get(neighborID);
+            neighbor.isNotInterestedMe();
             try {
                 Log.uninterested(peerid, neighborID);
             } catch (IOException e) {
@@ -499,23 +503,19 @@ public class Peer {
         }
 
         //case functions
-        public void chokeMe(int peerid, int neighborID){
-            //possible implementation using HashSet <Integer> chokeMe
-            //maybe add this code into the remote peer class?
-            //chokeMe.add(peerid);
-            RemotePeer neighbor = remotePeers.get(peerid);
+        public void chokeMe(int neighborID, int peerid){
+            RemotePeer neighbor = remotePeers.get(neighborID);
             neighbor.isChokingMe();
-            //the neighbor that choked us will now save that we are choked
             try{
-                Log.choking(neighborID, peerid);
+                Log.choking(peerid, neighborID);
             }catch(IOException e){
                 System.out.println(e.toString());
             }
         }
 
-        public void unchokeMe(int peerid, int neighborID){
-            RemotePeer neighbor = remotePeers.get(peerid);
-            neighbor.unchoke();
+        public void unchokeMe(int neighborID, int peerid){
+            RemotePeer neighbor = remotePeers.get(neighborID);
+            neighbor.isUnchokingMe();
             try{
                 Log.unchoking(peerid, neighborID);
             }catch(IOException e){
@@ -606,6 +606,7 @@ public class Peer {
     public int getNumPieces(){
         return numPieces;
     }
+
     public void optimisticUnchokingInterval(){
 
     }
