@@ -511,10 +511,11 @@ public class Peer {
 
         }
 
-        // TODO
         public int findNewPieceIndex(int peerid){
 
-            return 1;
+            RemotePeer neighbor = remotePeers.get(peerid);
+
+            return neighbor.getRandomPieceWanted(bitfield);
         }
     }
 
