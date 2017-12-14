@@ -154,9 +154,7 @@ public class Peer {
         public void run(){
 
             while(numConn < expectedConnections) {
-
                 try {
-
                     Socket newConnection = listener.accept();
                     numConn++;
                     ServerHandler SH = new ServerHandler(newConnection);
@@ -166,11 +164,9 @@ public class Peer {
                     e.printStackTrace();
                 }
             }
-
         }
 
         public void closeConnections(){
-
             try {
 
                 listener.close();
@@ -323,7 +319,7 @@ public class Peer {
                             if(!neighbor.isChoked()){
                                 //check if neighbor is preferred
                                 //check if optimistically unchoked neighbor changed
-                                //because peer might've
+                                //because peer might've been choked during that change
                                 byte[] piece = getPiece(index);
                                 //we parse the data into the pieceMsg format
                                 byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
@@ -350,7 +346,7 @@ public class Peer {
             neighbor.isInterestedMe();
             //the neighbor that choked us will now save that we are choked
             try{
-                Log.choking(peerid, neighborID);
+                Log.interested(peerid, neighborID);
             }catch(IOException e){
                 System.out.println(e.toString());
             }
@@ -469,12 +465,23 @@ public class Peer {
                             chokeMe(serverID, recepientID);
                             break;
                         case 1:
+                            index = dIn.readInt();
                             unchokeMe(serverID, recepientID);
+                            byte [] requestMsg = messageHandler.getRequestMessage(index);
+                            dOut.write(requestMsg);
                             break;
                         case 4:
                             index = dIn.readInt();
                             neighbor.hasPiece(index);
                             Log.have(serverID, recepientID, index);
+                            //determine to send interested message or not
+                            for(int i = 0; i < bitfield.size(); i++){
+                                //if peer does not have piece and neighbor does, then send interested msg
+                                if(!bitfield.get(i) && neighbor.getBitfield().get(i)){
+                                    byte [] interestedMsg = messageHandler.getInterestedMessage();
+                                    dOut.write(interestedMsg);
+                                }
+                            }
                             break;
                         case 5:
                             message_payload = new byte[message_length - 1];
@@ -490,9 +497,13 @@ public class Peer {
                             dIn.readFully(message_payload);
                             addPiece(index, message_payload);
                             Log.downloadingPiece(serverID, recepientID, index, fileHandler.numPiecesPeerHas());
-                            //we should also send have message to tell the other remote peers an update on what it has
-                            byte [] haveMsg = messageHandler.getHaveMessage(index);
-                            dOut.write(haveMsg);
+
+                            //send have message to other remote peers to update their bitfields of what we have
+                            for(Integer key : connections.keySet()){
+                                DataOutputStream out = new DataOutputStream(connections.get(key).getOutputStream());
+                                byte [] haveMsg = messageHandler.getHaveMessage(index);
+                                out.write(haveMsg);
+                            }
                             break;
                     }
                 }
@@ -546,9 +557,7 @@ public class Peer {
         }
 
         public int findNewPieceIndex(int peerid){
-
             RemotePeer neighbor = remotePeers.get(peerid);
-
             return neighbor.getRandomPieceWanted(bitfield);
         }
     }
@@ -619,6 +628,7 @@ public class Peer {
     public void unchokingInterval(){
 
     }
+
     public void ALLDONE(){
         fileHandler.writeFile();
     }

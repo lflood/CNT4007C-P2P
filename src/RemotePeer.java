@@ -51,13 +51,10 @@ public class RemotePeer {
     public int getRandomPieceWanted(BitSet comparisonSet){
 
         ArrayList<Integer> indexList = new ArrayList<>();
-
         int numPieces = bitfield.size();
 
         for(int i = 0; i < numPieces; i++){
-
             if(bitfield.get(i) && !comparisonSet.get(i)){ // if piece is in remote peer and not calling peer, add to index list
-
                 indexList.add(i);
             }
         }
