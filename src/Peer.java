@@ -112,7 +112,7 @@ public class Peer {
         ArrayList<ClientHandler> CH = new ArrayList<ClientHandler>(totalPeers);
         for(int p = 0; p < (peerNum - 1); p++)
 		{
-            CH.add(new ClientHandler(peerInfo, p));
+            CH.add(new ClientHandler(peerInfo, p, true));
             CH.get(p).start();
 		}
 
@@ -159,7 +159,7 @@ public class Peer {
 
                     Socket newConnection = listener.accept();
                     numConn++;
-                    ServerHandler SH = new ServerHandler(newConnection);
+                    ServerHandler SH = new ServerHandler(newConnection, true); // true cuz is connection init
                     SH.start();
 
                 } catch (Exception e) {
@@ -186,10 +186,12 @@ public class Peer {
     private class ServerHandler extends Thread
     {
         Socket connection;
-        int numConn = 0;
-        public ServerHandler (Socket connection) throws IOException
+        boolean initializing;
+
+        public ServerHandler (Socket connection, boolean initializing) throws IOException
         {
                 this.connection = connection;
+                this.initializing = initializing;
         }
         
         public void run() 
@@ -200,7 +202,7 @@ public class Peer {
 
                 try 
                 {
-                    ServerRequestHandler RH = new ServerRequestHandler(connection);
+                    ServerRequestHandler RH = new ServerRequestHandler(connection, initializing);
                     RH.start();
                     System.out.println("Client is connected!");
 
@@ -237,32 +239,33 @@ public class Peer {
     private class ServerRequestHandler extends Thread //rename to request handler
     {
         private Socket connection;
-        private ObjectInputStream in;   //stream read from the socket
-        private ObjectOutputStream out;    //stream write to the socket
+        private DataInputStream dIn;   //stream read from the socket
+        private DataOutputStream dOut;    //stream write to the socket
         private int clientID;
+        private boolean initializing;
 
-        public ServerRequestHandler(Socket connection)
+        public ServerRequestHandler(Socket connection, boolean initializing)
         {
                     this.connection = connection;
+                    this.initializing =initializing;
         }
 
-        public void run()
-        {
-            try {
+        public void init(){
 
+            try {
                 HandShakeMessage hMsg = new HandShakeMessage();
                 //Utility.SendMsg(mySocket,Msg)//synchronized on the socket level so that only one can write to the socket at the same time
 
                 // SEND HANDSHAKE
                 byte[] handshake = hMsg.getByteMessage(hShkHeader, peerid);
 
-                DataOutputStream dOut = new DataOutputStream(connection.getOutputStream());
+                dOut = new DataOutputStream(connection.getOutputStream());
 
                 dOut.writeInt(handshake.length); // write length of the message
                 dOut.write(handshake);           // write the message
 
                 // RECEIVE HANDSHAKE
-                DataInputStream dIn = new DataInputStream(connection.getInputStream());
+                dIn = new DataInputStream(connection.getInputStream());
 
                 int length = dIn.readInt();
                 if (length > 0) {
@@ -274,7 +277,7 @@ public class Peer {
                 }
 
                 // add newly connected peer to RemotePeers
-                if(!bitfieldIsEmpty()) {
+                if (!bitfieldIsEmpty()) {
                     System.out.println(bitfieldIsEmpty());
                     byte[] msg = messageHandler.getBitfieldMessage(bitfield);
 
@@ -286,11 +289,29 @@ public class Peer {
                 connections.put(clientID, connection);
                 System.out.println("Connection stored: " + peerid + " and " + clientID);
 
+                ClientRequestHandler CH = new ClientRequestHandler(connection, peerid, false);
+                CH.start();
+
+            } catch(Exception ioException) {
+
+            }
+        }
+
+        public void run()
+        {
+            try {
+
+                if(initializing){
+                    init();
+                }
+
                 //start while loop for receiving messages
                 //have a separate thread to send message that dies
 
                 RemotePeer neighbor = remotePeers.get(clientID);
                 int index;
+
+                System.out.println("starting server loop");
 
                 while(true){ //have a better termination condition!
                     int message_length = dIn.readInt();
@@ -302,6 +323,7 @@ public class Peer {
                         //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
                         case 2:
                             interestedMe(peerid, clientID);
+                            System.out.println(peerid + ": Interested message from " + clientID);
                             break;
                         case 3:
                             notInterestedMe(peerid, clientID);
@@ -394,33 +416,34 @@ public class Peer {
     {
         private Socket connection;
         private int serverID;
-        private ObjectInputStream in;   //stream read from the socket
-        private ObjectOutputStream out;    //stream write to the socket
+        private boolean initializing;
+        private DataInputStream dIn;   //stream read from the socket
+        private DataOutputStream dOut;    //stream write to the socket
 
-        public ClientRequestHandler(Socket connection, int serverID)
+        public ClientRequestHandler(Socket connection, int serverID, boolean initializing)
         {
             this.connection = connection;
             this.serverID = serverID;
+            this.initializing = initializing;
         }
 
-        public void run()
-        {
-            int recepientID = 0;
-            try {
+        public void init(){
 
+            try{
                 HandShakeMessage hMsg = new HandShakeMessage();
+                int recepientID = 0;
                 //Utility.SendMsg(mySocket,Msg)//synchronized on the socket level so that only one can write to the socket at the same time
 
                 // SEND HANDSHAKE
                 byte[] handshake = hMsg.getByteMessage(hShkHeader, peerid);
 
-                DataOutputStream dOut = new DataOutputStream(connection.getOutputStream());
+                dOut = new DataOutputStream(connection.getOutputStream());
 
                 dOut.writeInt(handshake.length); // write length of the message
                 dOut.write(handshake);           // write the message
 
                 // RECEIVE HANDSHAKE
-                DataInputStream dIn = new DataInputStream(connection.getInputStream());
+                dIn = new DataInputStream(connection.getInputStream());
 
                 int length = dIn.readInt();
                 if (length > 0) {
@@ -451,13 +474,35 @@ public class Peer {
                 connections.put(serverID, connection);
                 System.out.println("Connection stored: " + peerid + " and " + serverID);
 
+                ServerHandler SH = new ServerHandler(connection, false);
+                SH.start();
+
+            }catch(Exception ioException)
+            {
+
+            }
+        }
+
+        public void run()
+        {
+            try {
+
+                if(initializing){
+                    init();
+                }
+
                 //start while loop for receiving messages
                 //have a separate thread to send message that dies
 
                 RemotePeer neighbor = remotePeers.get(serverID);
                 int index;
 
+                System.out.println("starting server loop");
+
                 while(true){ //have a better termination condition!
+
+                    byte [] msg = messageHandler.getInterestedMessage();
+                    dOut.write(msg);
 
                     int message_length = dIn.readInt();
                     System.out.println(message_length);
@@ -466,15 +511,15 @@ public class Peer {
                     byte[] message_payload;
                     switch(message_type){
                         case 0:
-                            chokeMe(serverID, recepientID);
+                            chokeMe(serverID, peerid);
                             break;
                         case 1:
-                            unchokeMe(serverID, recepientID);
+                            unchokeMe(serverID, peerid);
                             break;
                         case 4:
                             index = dIn.readInt();
                             neighbor.hasPiece(index);
-                            Log.have(serverID, recepientID, index);
+                            Log.have(serverID, peerid, index);
                             break;
                         case 5:
                             message_payload = new byte[message_length - 1];
@@ -489,7 +534,7 @@ public class Peer {
                             message_payload = new byte[message_length-5]; //this is the piece contents
                             dIn.readFully(message_payload);
                             addPiece(index, message_payload);
-                            Log.downloadingPiece(serverID, recepientID, index, fileHandler.numPiecesPeerHas());
+                            Log.downloadingPiece(serverID, peerid, index, fileHandler.numPiecesPeerHas());
                             //we should also send have message to tell the other remote peers an update on what it has
                             byte [] haveMsg = messageHandler.getHaveMessage(index);
                             dOut.write(haveMsg);
@@ -564,10 +609,13 @@ public class Peer {
     	int pReq;
         ArrayList<String> peerInfo;
         String address;
-        public ClientHandler(ArrayList<String> peerInfo, int pReq) throws IOException
+        boolean initializing;
+
+        public ClientHandler(ArrayList<String> peerInfo, int pReq, boolean initializing) throws IOException
         {
                 this.peerInfo = peerInfo;
                 this.pReq = pReq;
+                this.initializing = initializing;
         }
         
         public void run() 
@@ -581,7 +629,7 @@ public class Peer {
    	    		requestSocket = new Socket(hostname, port);
    	    		//socket connected
 
-                ClientRequestHandler RH = new ClientRequestHandler(requestSocket, peerID);
+                ClientRequestHandler RH = new ClientRequestHandler(requestSocket, peerID, initializing);
                 RH.run(); // run instead of start so that it it doesn't run on a separate thread!
 
             }
@@ -622,4 +670,6 @@ public class Peer {
     public void ALLDONE(){
         fileHandler.writeFile();
     }
+
+    // TODO close sockets
 }
