@@ -123,13 +123,13 @@ public class Message {
 		return result;
 	}
 
-	public byte[] getHaveMessage(byte[] index){
+	public byte[] getHaveMessage(int index){
 
 		int messageLength = 5;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(5).array();
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
-		byte[] indexBytes = index; // TODO MAKE LEGIT
+		byte[] indexBytes = ByteBuffer.allocate(4).putInt(index).array(); // TODO MAKE LEGIT
 
 		byte[] result = null;
 
