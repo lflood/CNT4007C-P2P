@@ -23,6 +23,7 @@ public class Peer {
     private FileHandling fileHandler;
 
     private Hashtable<Integer, RemotePeer> remotePeers;
+    private Hashtable<Integer, Socket> connections;
 
     //Common.cfg contents
 
@@ -58,6 +59,7 @@ public class Peer {
 
 
         remotePeers = new Hashtable<>();
+        connections = new Hashtable<>();
 
         //create peer_ID files
         new File("peer_" + peerid).mkdir();
@@ -98,67 +100,121 @@ public class Peer {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        
+
+
         //currently hard coded for how many connections it expects. Needs to be changed.
-        ServerHandler SH = new ServerHandler(port, numberOfExpectedPeers-(peerid-1001));
-        SH.start();
         //assign above to variable first so you can start variable and also join
 
         //parse peerInfo and then begin for loop for each server to be connected to
         //create new thread and pass in peerID, port, etc
-        
+
+        ConnectionHandler connectionHandler = new ConnectionHandler(5); //TODO
 
         ArrayList<ClientHandler> CH = new ArrayList<ClientHandler>(peerid-1001);
         for(int p = 0; p < peerid-1001; p++)
 		{
-				CH.add(new ClientHandler(peerInfo, p+1001));
-				CH.get(p).start();
+            CH.add(new ClientHandler(peerInfo, p+1001));
+            CH.get(p).start();
 		}
-        
-        SH.join();
+
         // for each CH CH.join()
         for (int i = 0; i<CH.size(); i++)
         {
         	CH.get(i).join();
         }
+
+        connectionHandler.closeListener();
     }
-   
+
+    /////////////////////////////
+
+    private class ConnectionHandler extends Thread
+    {
+        ServerSocket listener;
+        boolean closed;
+        int numConn;
+        int expectedConnections;
+
+        public ConnectionHandler(int expectedConnections){
+
+            try {
+
+                listener = new ServerSocket(port);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            closed = false;
+            numConn = 0;
+            this.expectedConnections = expectedConnections;
+        }
+
+        public void run(){
+
+            while(numConn < expectedConnections) {
+
+                try {
+
+                    Socket newConnection = listener.accept();
+                    numConn++;
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
+        }
+
+        public void closeListener(){
+
+            try {
+
+                listener.close();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
 /////////////////////////////
     
     private class ServerHandler extends Thread
-
     {
-    	ArrayList<ServerRequestHandler> RH = new ArrayList<ServerRequestHandler>(peerid-1001);
-        int port;
+        Socket connection;
         int numConn = 0;
-        int expectedClients;
-        public ServerHandler (int port, int expectedClients) throws IOException
+        public ServerHandler (Socket connection) throws IOException
         {
-                this.port = port;
-                this.expectedClients = expectedClients;
+                this.connection = connection;
         }
         
         public void run() 
         {
             try
             {
-                System.out.println("The server is running."); 
-                ServerSocket listener = new ServerSocket(port);
+                System.out.println("The server is running.");
 
                 try 
                 {
+                    ServerRequestHandler RH = new ServerRequestHandler(connection);
+                    RH.start();
+                    System.out.println("Client is connected!");
+
+                    /*
                    // define RH somewhere and allocate enough memory or use arraylist append!
                     while(numConn < expectedClients) {
                         Socket accepted = listener.accept();
+
                         RH.add(new ServerRequestHandler(accepted));   //add the flag bit indicating whether they shook hands or not
                         RH.get(numConn).start();
                         numConn++;
                         System.out.println("Client is connected!");
-                    }
+                    }*/
                 } 
                 finally 
                 {
-                    listener.close();
+
                 } 
             }
             catch(Exception e)
@@ -224,6 +280,8 @@ public class Peer {
 
                 // create remote peer class to store neighbor info
                 remotePeers.put(clientID, new RemotePeer(clientID));
+                connections.put(clientID, connection);
+                System.out.println("Connection stored: " + peerid + " and " + clientID);
 
                 //start while loop for receiving messages
                 //have a separate thread to send message that dies
@@ -383,6 +441,8 @@ public class Peer {
 
                 // create remote peer class to store neighbor info
                 remotePeers.put(serverID, new RemotePeer(serverID));
+                connections.put(serverID, connection);
+                System.out.println("Connection stored: " + peerid + " and " + serverID);
 
                 //start while loop for receiving messages
                 //have a separate thread to send message that dies
