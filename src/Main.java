@@ -56,9 +56,7 @@ public class Main {
                 }
                 Peer peer = new Peer(peerIDPass, portPass, hasFilePass, peerInfo, numPeers, counter);
 
-                line.close();  
-                           
-
+                line.close();
 
             }
             catch(Exception e) {
