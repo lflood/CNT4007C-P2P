@@ -4,15 +4,20 @@ import java.lang.reflect.Array;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 
-import static com.sun.deploy.cache.Cache.copyFile;
 
 public class FileHandling {
     Peer peer;
+    private int fileSize;
+    private int pieceSize;
+    private int numPieces;
+
     private ArrayList<Piece> pieces;
-    public FileHandling(){
-        int fileSize = peer.fileSize;
-        int pieceSize = peer.pieceSize;
-        int numPieces = peer.numPieces;
+
+    public FileHandling(Peer peer){
+        this.peer = peer;
+        fileSize = peer.getFileSize();
+        pieceSize = peer.getPieceSize();
+        numPieces = peer.getNumPieces();
 
         if(fileSize%pieceSize !=0 ? true:false){
             numPieces = fileSize/pieceSize + 1;
@@ -20,24 +25,78 @@ public class FileHandling {
             numPieces = fileSize/pieceSize;
         }
 
-        if(peer.hasFile){
-            File from = new File(peer.fileName);
-            File to = new File("./peer_"+peer.peerid+"/"+peer.fileName);
+        if(peer.getHasFile()){
+            File from = new File("./src/"+peer.fileName);
+            System.out.println("filename is: " + peer.fileName);
+            File to = new File("./peer_"+peer.getPeerID()+"/"+peer.fileName);
             try{
-                Files.copy(from.toPath(), to.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(from.toPath(), to.toPath());
             } catch(IOException e){
                 e.printStackTrace();
             }
         }
 
-        if(peer.hasFile){
+        if(peer.getHasFile()) {
             pieces = new ArrayList<Piece>();
-
-            for(int i = 0; i < numPieces; i++){
-                pieces.add(new Piece());
+            splitDataIntoPieces(numPieces);
+        }else{
+            pieces = new ArrayList<Piece>();
+            for (int i = 0; i < numPieces; i++) {
+                Piece piece = new Piece();
+                pieces.add(piece);
             }
         }
 
+    }
+    private void splitDataIntoPieces(int numPieces){
+        FileInputStream fileInStream = null;
+
+        byte[] fileContents;
+        fileContents = new byte[peer.fileSize];
+
+        try{
+            fileInStream = new FileInputStream(new File("./peer_"+peer.getPeerID()+"/"+peer.fileName));
+            fileInStream.read(fileContents);
+        }catch(Exception e){
+            e.printStackTrace();
+        }finally{
+            try{
+                fileInStream.close();
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        for(int i = 0; i < numPieces; i++){
+            byte [] pieceData = new byte[peer.pieceSize];
+            for(int j = 0; j < peer.pieceSize; j++){
+                int fileIndex = i*pieceData.length;
+                fileIndex += j;
+                if(fileIndex >= fileContents.length){
+                    pieceData[j] = (byte)0;
+                }else{
+                    pieceData[j] = fileContents[fileIndex];
+                }
+            }
+            pieces.add(new Piece(pieceData));
+        }
+
+    }
+    private void writingFile(){
+
+    }
+
+    public ArrayList<Piece> getPieces(){
+        return pieces;
+    }
+    public void setPieces(ArrayList<Piece> pieces){
+        this.pieces = pieces;
+    }
+    public Piece getPiece(int index){
+        return pieces.get(index);
+    }
+    public void setPiece(int index, Piece piece) {
+        this.pieces.set(index, piece);
     }
 
 }

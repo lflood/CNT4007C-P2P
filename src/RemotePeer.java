@@ -23,13 +23,6 @@ public class RemotePeer {
     public int getID(){
         return ID;
     }
-    public boolean checkChoke(){
-        return choked;
-    }
-    public boolean checkInterested(){
-        return interested;
-    }
-
 
     public byte [] getBitfield(){
         synchronized (this) {
@@ -86,9 +79,7 @@ public class RemotePeer {
         return result;
     }
 
-    public void choke(){
-        choked = true;
-    }
+    public void choke(){ choked = true; }
 
     public void unchoke(){
         choked = false;
