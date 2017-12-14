@@ -83,8 +83,28 @@ public class FileHandling {
         }
 
     }
-    private void writingFile(){
+    public void writeFile(){
+        int numPieces = peer.getNumPieces();
+        int fileSize = peer.getFileSize();
 
+        byte [] fileDone = new byte [fileSize];
+        int curr = 0;
+        for(int i = 0; i < numPieces; i++){
+            byte [] temp = pieces.get(i).getPieceData();
+            for(int j = 0; j < temp.length; j++){
+                fileDone[curr] = temp[j];
+                curr++;
+            }
+        }
+        try{
+            FileOutputStream fileOutStream = new FileOutputStream("./peer_"+peer.getPeerID()+"/"+peer.fileName);
+            fileOutStream.write(fileDone);
+            fileOutStream.close();
+        }catch(FileNotFoundException e) {
+            e.printStackTrace();
+        }catch (IOException e){
+            e.printStackTrace();
+        }
     }
 
     public ArrayList<Piece> getPieces(){

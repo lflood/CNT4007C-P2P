@@ -13,6 +13,8 @@ public class RemotePeer {
     private boolean choked;
     private boolean interested;
     private boolean bitfieldInitialized;
+    private boolean iAmChoked;
+
 
     //might want to pass in port maybe
     public RemotePeer(int ID) {
@@ -22,6 +24,7 @@ public class RemotePeer {
         this.interested = false;
         this.bitfield = null;
         bitfieldInitialized = false;
+        iAmChoked = false; //TODO maybe set to true?
     }
     public int getID(){
         return ID;
@@ -33,12 +36,6 @@ public class RemotePeer {
         }
     }
 
-    public void updateBitfield(int index){
-
-        //TODO
-        this.bitfield = bitfield;
-        // set index location to having a piece
-    }
     public void initializeBitfield(BitSet bitfield){
 
         if(!bitfieldInitialized) {
@@ -123,4 +120,8 @@ public class RemotePeer {
     public void hasPiece(int index){
         bitfield.set(index);
     }
+    public boolean isChokingMe(){
+        return iAmChoked;
+    }
+
 }
