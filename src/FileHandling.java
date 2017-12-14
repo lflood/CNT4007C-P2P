@@ -10,6 +10,7 @@ public class FileHandling {
     private int fileSize;
     private int pieceSize;
     private int numPieces;
+    private int currentTotalPiecesPeerHas;
 
     private ArrayList<Piece> pieces;
 
@@ -97,6 +98,10 @@ public class FileHandling {
     }
     public void setPiece(int index, byte [] piece) {
         this.pieces.set(index, new Piece (piece));
+        currentTotalPiecesPeerHas++;
+    }
+    public int numPiecesPeerHas(){
+        return currentTotalPiecesPeerHas;
     }
 
 }

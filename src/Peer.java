@@ -242,41 +242,30 @@ public class Peer {
                         case 2:
                             interested(peerid, clientID);
                             break;
-
                         case 3:
                             notInterested(peerid, clientID);
-                            break;
-                        case 4:
-                            index = dIn.readInt();
-
-                            neighbor.updateBitfield(index);
                             break;
                         case 5:
                             message_payload = new byte[message_length - 1];
                             dIn.readFully(message_payload);
-
                             neighbor = remotePeers.get(clientID);
-
                             BitSet initBitfield = BitSet.valueOf(message_payload);
-
                             neighbor.initializeBitfield(initBitfield);
                             System.out.println("bitfield message received");
                             break;
                         case 6:
                             //received a request message for a certain piece index
                             index = dIn.readInt();
-
                             //we have the piece contents below
-
-
                             // if client not choked, send piece
                             //TODO add check for choked
-
-                            byte[] piece = getPiece(index);
-                            //we parse the data into the pieceMsg format
-                            byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
-                            //send it out to our remote peer
-                            dOut.write(pieceMsg);
+                            if(!neighbor.isChoked()){
+                                byte[] piece = getPiece(index);
+                                //we parse the data into the pieceMsg format
+                                byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
+                                //send it out to our remote peer
+                                dOut.write(pieceMsg);
+                            }
                             break;
                         }
                 }
@@ -321,11 +310,6 @@ public class Peer {
         // TODO
         public byte[] getPiece(int index){
             return fileHandler.getPiece(index);
-        }
-
-        // TODO
-        public void addPiece(int index, byte[] piece){
-
         }
 
         // TODO
@@ -417,43 +401,30 @@ public class Peer {
                         case 0:
                             chokeNeighbor(serverID, recepientID);
                             break;
-
                         case 1:
                             unchokeNeighbor(serverID, recepientID);
                             break;
                         case 4:
                             index = dIn.readInt();
-                            //we have piece index
-                            //now iterate to the appropriate bit in remotePeer's bitfield
-                            //to update our records of what that remotePeer has
-                            //neighbor.updateBitfield(bitfield);
+                            neighbor.hasPiece(index);
+                            Log.have(serverID, recepientID, index);
                             break;
                         case 5:
                             message_payload = new byte[message_length - 1];
                             dIn.readFully(message_payload);
-
-
                             neighbor = remotePeers.get(serverID);
-
                             BitSet initBitfield = BitSet.valueOf(message_payload);
-
                             neighbor.initializeBitfield(initBitfield);
-
                             System.out.println("bitfield message received");
-                            break;
-                        case 6:
-                            index = dIn.readInt();
-                            byte[] piece = getPiece(index);
-                            byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
-                            dOut.write(pieceMsg);
                             break;
                         case 7:
                             index = dIn.readInt();
                             message_payload = new byte[message_length-5]; //this is the piece contents
                             dIn.readFully(message_payload);
                             addPiece(index, message_payload);
+                            Log.downloadingPiece(serverID, recepientID, index, fileHandler.numPiecesPeerHas());
                             //we should also send have message to tell the other remote peers an update on what it has
-                            byte [] haveMsg = messageHandler.getHaveMessage(message_payload);
+                            byte [] haveMsg = messageHandler.getHaveMessage(index);
                             dOut.write(haveMsg);
                             break;
                     }
@@ -508,7 +479,6 @@ public class Peer {
         // TODO
         public void addPiece(int index, byte[] piece){
             fileHandler.setPiece(index, piece);
-
         }
 
         // TODO

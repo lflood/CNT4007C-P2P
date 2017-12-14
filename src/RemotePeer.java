@@ -120,4 +120,7 @@ public class RemotePeer {
         interested = false;
     }
 
+    public void hasPiece(int index){
+        bitfield.set(index);
+    }
 }
