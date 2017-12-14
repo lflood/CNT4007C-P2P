@@ -13,7 +13,8 @@ public class RemotePeer {
     private boolean choked;
     private boolean interested;
     private boolean bitfieldInitialized;
-    private boolean iAmChoked;
+    private boolean chokingMe;
+    private boolean interestedInMe;
 
 
     //might want to pass in port maybe
@@ -24,7 +25,6 @@ public class RemotePeer {
         this.interested = false;
         this.bitfield = null;
         bitfieldInitialized = false;
-        iAmChoked = false; //TODO maybe set to true?
     }
     public int getID(){
         return ID;
@@ -73,14 +73,6 @@ public class RemotePeer {
         return bitfieldInitialized;
     }
 
-    public boolean isChoked(){
-        return choked;
-    }
-
-    public boolean isInterested() {
-        return interested;
-    }
-
     public byte[] getByteMessage(String header, int id){
 
         byte[] headerBytes = header.getBytes();
@@ -103,25 +95,53 @@ public class RemotePeer {
         return result;
     }
 
+    public void hasPiece(int index){
+        bitfield.set(index);
+    }
+
+    //choke variables for servers of other peers to access
     public void choke(){ choked = true; }
 
     public void unchoke(){
         choked = false;
     }
 
-    public void setInterested(){
+    public boolean isChoked(){
+        return choked;
+    }
+
+    //choke variables for clients of other peers to access
+    public void isChokingMe(){
+        chokingMe = true;
+    }
+    public void isUnchokingMe(){
+        chokingMe = false;
+    }
+    public boolean amIChoked(){
+        return chokingMe;
+    }
+
+    //interested variables for servers of other peers to access
+    public void isInterestedMe(){
+        interestedInMe = true;
+    }
+    public void isNotInterestedMe(){
+        interestedInMe = false;
+    }
+    public boolean amIInterested(){
+        return interestedInMe;
+    }
+
+    //interested variables for clients of other peers to access
+    public void interested(){
         interested = true;
     }
 
-    public void setNotInterested(){
+    public void notInterested(){
         interested = false;
     }
 
-    public void hasPiece(int index){
-        bitfield.set(index);
+    public boolean isInterested(){
+        return interested;
     }
-    public boolean isChokingMe(){
-        return iAmChoked;
-    }
-
 }
