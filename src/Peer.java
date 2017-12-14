@@ -249,38 +249,36 @@ public class Peer {
                         case 4:
                             index = dIn.readInt();
 
-                            //neighbor.updateBitfield(index);
+                            neighbor.updateBitfield(index);
                             break;
                         case 5:
-                            message_payload = new byte[message_length-1];
+                            message_payload = new byte[message_length - 1];
                             dIn.readFully(message_payload);
 
                             neighbor = remotePeers.get(clientID);
 
-                            neighbor.initializeBitfield(message_payload);
+                            BitSet initBitfield = BitSet.valueOf(message_payload);
+
+                            neighbor.initializeBitfield(initBitfield);
                             System.out.println("bitfield message received");
                             break;
                         case 6:
                             //received a request message for a certain piece index
                             index = dIn.readInt();
+
                             //we have the piece contents below
+
+
+                            // if client not choked, send piece
+                            //TODO add check for choked
+
                             byte[] piece = getPiece(index);
                             //we parse the data into the pieceMsg format
                             byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
                             //send it out to our remote peer
                             dOut.write(pieceMsg);
                             break;
-
-                        case 7:
-                            index = dIn.readInt();
-
-                            message_payload = new byte[message_length-5];
-                            dIn.readFully(message_payload);
-
-                            addPiece(index, message_payload);
-
-                            break;
-                    }
+                        }
                 }
             }
             catch(Exception ioException)
@@ -327,6 +325,16 @@ public class Peer {
 
         // TODO
         public void addPiece(int index, byte[] piece){
+
+        }
+
+        // TODO
+        public boolean peerUpdated(){
+            return false;
+        }
+
+        // TODO
+        public void sendUpdateMessages(){
 
         }
     }
@@ -421,9 +429,16 @@ public class Peer {
                             //neighbor.updateBitfield(bitfield);
                             break;
                         case 5:
-                            message_payload = new byte[message_length-1];
+                            message_payload = new byte[message_length - 1];
                             dIn.readFully(message_payload);
-                            neighbor.initializeBitfield(message_payload);
+
+
+                            neighbor = remotePeers.get(serverID);
+
+                            BitSet initBitfield = BitSet.valueOf(message_payload);
+
+                            neighbor.initializeBitfield(initBitfield);
+
                             System.out.println("bitfield message received");
                             break;
                         case 6:
@@ -494,6 +509,12 @@ public class Peer {
         public void addPiece(int index, byte[] piece){
             fileHandler.setPiece(index, piece);
 
+        }
+
+        // TODO
+        public int findNewPieceIndex(int peerid){
+
+            return 1;
         }
     }
 
