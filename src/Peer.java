@@ -47,15 +47,15 @@ public class Peer {
     public static Peer getPeer() {return peer}
     */
 
-    public Peer(int peerid, int port, boolean hasFile, Hashtable<Integer, String> peerInfo, int targNum) throws IOException, InterruptedException {
+    public Peer(int peerid, int port, boolean hasFile, Hashtable<Integer, String> peerInfo, int peerNum, int totalPeers) throws IOException, InterruptedException {
         this.peerid = peerid;
         this.port = port;
         this.hasFile = hasFile;
         this.peerInfo = peerInfo;
-        this.targNum = targNum;
+        this.targNum = peerNum;
 
         hShkHeader = "P2PFILESHARINGPROJ";
-        numberOfExpectedPeers = targNum-1;
+        numberOfExpectedPeers = totalPeers - peerNum;
 
 
         remotePeers = new Hashtable<>();
@@ -95,8 +95,6 @@ public class Peer {
             }
             System.out.println("fileSize is: " + fileSize);
             fileHandler = new FileHandling(this);
-            // TODO set to actual bitfield
-
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -459,10 +457,10 @@ public class Peer {
                     byte[] message_payload;
                     switch(message_type){
                         case 0:
-                            chokeNeighbor(serverID, recepientID);
+                            chokeMe(serverID, recepientID);
                             break;
                         case 1:
-                            unchokeNeighbor(serverID, recepientID);
+                            unchokeMe(serverID, recepientID);
                             break;
                         case 4:
                             index = dIn.readInt();
@@ -501,20 +499,21 @@ public class Peer {
         }
 
         //case functions
-        public void chokeNeighbor(int peerid, int neighborID){
+        public void chokeMe(int peerid, int neighborID){
             //possible implementation using HashSet <Integer> chokeMe
             //maybe add this code into the remote peer class?
             //chokeMe.add(peerid);
             RemotePeer neighbor = remotePeers.get(peerid);
-            neighbor.choke();
+            neighbor.isChokingMe();
+            //the neighbor that choked us will now save that we are choked
             try{
-                Log.choking(peerid, neighborID);
+                Log.choking(neighborID, peerid);
             }catch(IOException e){
                 System.out.println(e.toString());
             }
         }
 
-        public void unchokeNeighbor(int peerid, int neighborID){
+        public void unchokeMe(int peerid, int neighborID){
             RemotePeer neighbor = remotePeers.get(peerid);
             neighbor.unchoke();
             try{
@@ -612,5 +611,8 @@ public class Peer {
     }
     public void unchokingInterval(){
 
+    }
+    public void ALLDONE(){
+        fileHandler.writeFile();
     }
 }
