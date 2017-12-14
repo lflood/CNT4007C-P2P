@@ -14,7 +14,7 @@ public class Peer {
     private int peerid;
     private static int port;
     private static boolean hasFile;
-    private static Hashtable<Integer, String> peerInfo;
+    private static ArrayList<String> peerInfo;
     private static int targNum;
 
     private int numberOfFilePieces;
@@ -47,7 +47,7 @@ public class Peer {
     public static Peer getPeer() {return peer}
     */
 
-    public Peer(int peerid, int port, boolean hasFile, Hashtable<Integer, String> peerInfo, int peerNum, int totalPeers) throws IOException, InterruptedException {
+    public Peer(int peerid, int port, boolean hasFile, ArrayList<String> peerInfo, int peerNum, int totalPeers) throws IOException, InterruptedException {
         this.peerid = peerid;
         this.port = port;
         this.hasFile = hasFile;
@@ -106,22 +106,25 @@ public class Peer {
         //parse peerInfo and then begin for loop for each server to be connected to
         //create new thread and pass in peerID, port, etc
 
-        ConnectionHandler connectionHandler = new ConnectionHandler(5); //TODO
+        ConnectionHandler connectionHandler = new ConnectionHandler(numberOfExpectedPeers);
+        connectionHandler.start();
 
-        ArrayList<ClientHandler> CH = new ArrayList<ClientHandler>(peerid-1001);
-        for(int p = 0; p < peerid-1001; p++)
+        ArrayList<ClientHandler> CH = new ArrayList<ClientHandler>(totalPeers);
+        for(int p = 0; p < (peerNum - 1); p++)
 		{
-            CH.add(new ClientHandler(peerInfo, p+1001));
+            CH.add(new ClientHandler(peerInfo, p));
             CH.get(p).start();
 		}
 
+		//TODO MAKE SURE THESE JOIN
         // for each CH CH.join()
         for (int i = 0; i<CH.size(); i++)
         {
         	CH.get(i).join();
         }
 
-        connectionHandler.closeListener();
+        connectionHandler.join();
+        connectionHandler.closeConnections();
     }
 
     /////////////////////////////
@@ -156,6 +159,8 @@ public class Peer {
 
                     Socket newConnection = listener.accept();
                     numConn++;
+                    ServerHandler SH = new ServerHandler(newConnection);
+                    SH.start();
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -164,7 +169,7 @@ public class Peer {
 
         }
 
-        public void closeListener(){
+        public void closeConnections(){
 
             try {
 
@@ -557,9 +562,9 @@ public class Peer {
         //ASSUME YOU HAVE THE INFORMATION YOU NEED (IP , ID , PORT , ETC including the socket.)
         Socket requestSocket;
     	int pReq;
-        Hashtable<Integer, String> peerInfo;
+        ArrayList<String> peerInfo;
         String address;
-        public ClientHandler(Hashtable<Integer, String> peerInfo, int pReq) throws IOException 
+        public ClientHandler(ArrayList<String> peerInfo, int pReq) throws IOException
         {
                 this.peerInfo = peerInfo;
                 this.pReq = pReq;
@@ -570,12 +575,13 @@ public class Peer {
             try
             {
             	address = peerInfo.get(pReq);
-   	 			String hostname = address.split(":")[0];
-   	            int port = Integer.parseInt(address.split(":")[1]);
+            	int peerID = Integer.parseInt(address.split(":")[0]);
+   	 			String hostname = address.split(":")[1];
+   	            int port = Integer.parseInt(address.split(":")[2]);
    	    		requestSocket = new Socket(hostname, port);
    	    		//socket connected
 
-                ClientRequestHandler RH = new ClientRequestHandler(requestSocket, pReq);
+                ClientRequestHandler RH = new ClientRequestHandler(requestSocket, peerID);
                 RH.run(); // run instead of start so that it it doesn't run on a separate thread!
 
             }

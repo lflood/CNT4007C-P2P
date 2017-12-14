@@ -2,12 +2,13 @@
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.util.ArrayList;
 import java.util.Hashtable;
 
 
 public class Main {
     public static void main(String[] args) {
-        Hashtable<Integer, String> peerInfo = new Hashtable<Integer, String>();
+        ArrayList<String> peerInfo = new ArrayList<>();
         String checkID = null;
         if(args.length > 0) {
             checkID = args[0];
@@ -34,7 +35,7 @@ public class Main {
                     String hostname = tokens[1];
                     int port = Integer.valueOf(tokens[2]);
                     boolean hasFile = false;
-                    peerInfo.put(peerID, hostname + ":" + port);
+                    peerInfo.add(peerID + ":" + hostname + ":" + port);
                     if(tokens[3].equals("1")) {
                         hasFile = true;
                     }
