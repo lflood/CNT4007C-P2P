@@ -37,9 +37,6 @@ public class Peer {
 
     private BitSet bitfield = new BitSet();
 
-    private HashSet<Integer> chokeMe = new HashSet<>();
-    private HashSet<Integer> interested = new HashSet<>();
-
     /*should we have something like this below??
 
     private static int port;
@@ -242,12 +239,12 @@ public class Peer {
                     byte[] message_payload;
                     switch(message_type){
                         //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
-                        case 0:
-                            chokeNeighbor(peerid, clientID);
+                        case 2:
+                            interested(peerid, clientID);
                             break;
 
-                        case 1:
-                            unchokeNeighbor(peerid, clientID);
+                        case 3:
+                            notInterested(peerid, clientID);
                             break;
                         case 4:
                             index = dIn.readInt();
@@ -266,15 +263,19 @@ public class Peer {
                             System.out.println("bitfield message received");
                             break;
                         case 6:
+                            //received a request message for a certain piece index
                             index = dIn.readInt();
+
+                            //we have the piece contents below
+
 
                             // if client not choked, send piece
                             //TODO add check for choked
 
                             byte[] piece = getPiece(index);
-
+                            //we parse the data into the pieceMsg format
                             byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
-
+                            //send it out to our remote peer
                             dOut.write(pieceMsg);
                             break;
                         }
@@ -291,29 +292,24 @@ public class Peer {
         }
 
         //case functions
-        public void chokeNeighbor(int peerid, int neighborID){
-            //possible implementation using HashSet <Integer> chokeMe
-            //maybe add this code into the remote peer class?
-            //chokeMe.add(peerid);
+        public void interested(int peerid, int neighborID){
             RemotePeer neighbor = remotePeers.get(peerid);
-            neighbor.choke();
+            neighbor.setInterested();
             try{
-                Log.choking(peerid, neighborID);
-            }catch(IOException e){
+                Log.interested(peerid, neighborID);
+            }catch(IOException e) {
                 System.out.println(e.toString());
             }
         }
-
-        public void unchokeNeighbor(int peerid, int neighborID){
+        public void notInterested(int peerid, int neighborID) {
             RemotePeer neighbor = remotePeers.get(peerid);
-            neighbor.unchoke();
-            try{
-                Log.unchoking(peerid, neighborID);
-            }catch(IOException e){
+            neighbor.setNotInterested();
+            try {
+                Log.uninterested(peerid, neighborID);
+            } catch (IOException e) {
                 System.out.println(e.toString());
             }
         }
-
         public boolean bitfieldIsEmpty(){
             if(bitfield == null){
                 return true;
@@ -418,49 +414,47 @@ public class Peer {
                     System.out.println(message_type);
                     byte[] message_payload;
                     switch(message_type){
-                        case 2:
-                            interested(serverID, recepientID);
+                        case 0:
+                            chokeNeighbor(serverID, recepientID);
                             break;
 
-                        case 3:
-                            notInterested(serverID, recepientID);
+                        case 1:
+                            unchokeNeighbor(serverID, recepientID);
                             break;
-
                         case 4:
                             index = dIn.readInt();
-
+                            //we have piece index
+                            //now iterate to the appropriate bit in remotePeer's bitfield
+                            //to update our records of what that remotePeer has
                             //neighbor.updateBitfield(bitfield);
                             break;
                         case 5:
                             message_payload = new byte[message_length - 1];
                             dIn.readFully(message_payload);
 
+
                             neighbor = remotePeers.get(serverID);
 
                             BitSet initBitfield = BitSet.valueOf(message_payload);
 
                             neighbor.initializeBitfield(initBitfield);
+
                             System.out.println("bitfield message received");
                             break;
-
                         case 6:
                             index = dIn.readInt();
-
                             byte[] piece = getPiece(index);
-
                             byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
-
                             dOut.write(pieceMsg);
                             break;
-
                         case 7:
                             index = dIn.readInt();
-
-                            message_payload = new byte[message_length-5];
+                            message_payload = new byte[message_length-5]; //this is the piece contents
                             dIn.readFully(message_payload);
-
                             addPiece(index, message_payload);
-
+                            //we should also send have message to tell the other remote peers an update on what it has
+                            byte [] haveMsg = messageHandler.getHaveMessage(message_payload);
+                            dOut.write(haveMsg);
                             break;
                     }
                 }
@@ -476,20 +470,24 @@ public class Peer {
         }
 
         //case functions
-        public void interested(int peerid, int neighborID){
+        public void chokeNeighbor(int peerid, int neighborID){
+            //possible implementation using HashSet <Integer> chokeMe
+            //maybe add this code into the remote peer class?
+            //chokeMe.add(peerid);
             RemotePeer neighbor = remotePeers.get(peerid);
-            neighbor.setInterested();
+            neighbor.choke();
             try{
-                Log.interested(peerid, neighborID);
-            }catch(IOException e) {
+                Log.choking(peerid, neighborID);
+            }catch(IOException e){
                 System.out.println(e.toString());
             }
         }
-        public void notInterested(int peerid, int neighborID){
+
+        public void unchokeNeighbor(int peerid, int neighborID){
             RemotePeer neighbor = remotePeers.get(peerid);
-            neighbor.setNotInterested();
+            neighbor.unchoke();
             try{
-                Log.uninterested(peerid, neighborID);
+                Log.unchoking(peerid, neighborID);
             }catch(IOException e){
                 System.out.println(e.toString());
             }
@@ -504,11 +502,12 @@ public class Peer {
 
         // TODO
         public byte[] getPiece(int index){
-            return new byte [10];
+            return fileHandler.getPiece(index);
         }
 
         // TODO
         public void addPiece(int index, byte[] piece){
+            fileHandler.setPiece(index, piece);
 
         }
 
@@ -576,5 +575,11 @@ public class Peer {
     }
     public int getNumPieces(){
         return numPieces;
+    }
+    public void optimisticUnchokingInterval(){
+
+    }
+    public void unchokingInterval(){
+
     }
 }
