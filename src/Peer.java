@@ -329,7 +329,7 @@ public class Peer {
 
         // TODO
         public byte[] getPiece(int index){
-            return new byte [10];
+            return fileHandler.getPiece(index);
         }
 
         // TODO

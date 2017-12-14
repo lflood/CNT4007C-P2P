@@ -193,7 +193,6 @@ public class Message {
 	}
 
 	public byte[] getPieceMessage(int index, byte[] piece){
-
 		int messageLength = 5;
 
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();

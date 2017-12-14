@@ -92,8 +92,8 @@ public class FileHandling {
     public void setPieces(ArrayList<Piece> pieces){
         this.pieces = pieces;
     }
-    public Piece getPiece(int index){
-        return pieces.get(index);
+    public byte [] getPiece(int index){
+        return pieces.get(index).getPieceData();
     }
     public void setPiece(int index, Piece piece) {
         this.pieces.set(index, piece);

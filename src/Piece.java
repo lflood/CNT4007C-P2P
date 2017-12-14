@@ -33,6 +33,5 @@ public class Piece {
     public boolean isFull(){
         return full;
     }
-
 }
 
