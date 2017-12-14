@@ -1,11 +1,14 @@
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Random;
 
 public class RemotePeer {
 
-    private byte[] bitfield;
+    private BitSet bitfield;
     private int ID;
     private boolean choked;
     private boolean interested;
@@ -20,7 +23,7 @@ public class RemotePeer {
         bitfieldInitialized = false;
     }
 
-    public void initializeBitfield(byte[] bitfield){
+    public void initializeBitfield(BitSet bitfield){
 
         if(!bitfieldInitialized) {
             bitfieldInitialized = true;
@@ -30,6 +33,27 @@ public class RemotePeer {
 
             System.out.println("Error: bitfield already initialized");
         }
+    }
+
+    public int getRandomPieceWanted(BitSet comparisonSet){
+
+        ArrayList<Integer> indexList = new ArrayList<>();
+
+        int numPieces = bitfield.size();
+
+        for(int i = 0; i < numPieces; i++){
+
+            if(bitfield.get(i) && !comparisonSet.get(i)){ // if piece is in remote peer and not calling peer, add to index list
+
+                indexList.add(i);
+            }
+        }
+
+        Random random = new Random();
+
+        int index = random.nextInt(indexList.size());
+
+        return index;
     }
 
     public boolean hasBitfield(){

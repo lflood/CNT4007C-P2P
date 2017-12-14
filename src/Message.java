@@ -32,7 +32,7 @@ public class Message {
 		int messageLength = 1;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(0).array();
-		byte[] lengthBytes = ByteBuffer.allocate(2).putInt(messageLength).array();
+		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
 
@@ -53,7 +53,7 @@ public class Message {
 		int messageLength = 1;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(1).array();
-		byte[] lengthBytes = ByteBuffer.allocate(2).putInt(messageLength).array();
+		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
 
@@ -74,7 +74,7 @@ public class Message {
 		int messageLength = 1;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(2).array();
-		byte[] lengthBytes = ByteBuffer.allocate(2).putInt(messageLength).array();
+		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
 
@@ -95,7 +95,7 @@ public class Message {
 		int messageLength = 1;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(3).array();
-		byte[] lengthBytes = ByteBuffer.allocate(2).putInt(messageLength).array();
+		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
 
@@ -116,7 +116,7 @@ public class Message {
 		int messageLength = 5;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(5).array();
-		byte[] lengthBytes = ByteBuffer.allocate(1).putInt(messageLength).array();
+		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 		byte[] indexBytes = index; // TODO MAKE LEGIT
 
 		byte[] result = null;
@@ -157,13 +157,13 @@ public class Message {
 		return result;
 	}
 
-	public byte[] getRequestMessage(byte[] index){
+	public byte[] getRequestMessage(int index){
 
 		int messageLength = 5;
 
 		byte[] typeBytes = ByteBuffer.allocate(1).putInt(6).array();
-		byte[] lengthBytes = ByteBuffer.allocate(1).putInt(messageLength).array();
-		byte[] indexBytes = index; // TODO MAKE LEGIT
+		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
+		byte[] indexBytes = ByteBuffer.allocate(4).putInt(index).array();;
 
 		byte[] result = null;
 
