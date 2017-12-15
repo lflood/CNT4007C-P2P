@@ -320,10 +320,18 @@ public class Peer {
             this.remoteID = remoteID;
             this.connection = connections.get(remoteID);
             active = true;
+
+            Timer optimisticUnchokingIntervalTimer = new Timer();
+            optimisticUnchokingIntervalTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    optimisticUnchokingInterval();
+                }
+            }, 0, getOptimisticUnchokingInterval() * 1000);
         }
 
         public void run() {
-
+            System.out.println("made it in the input handler");
             try {
                 dIn = new DataInputStream(connection.getInputStream());
                 dOut = new DataOutputStream(connection.getOutputStream());
@@ -646,6 +654,7 @@ public class Peer {
 
     }
     public void optimisticUnchokingInterval(){
+        System.out.println("finding optimistic peer to unchoke");
         ArrayList<Integer> possibleOptimisticConnections = new ArrayList<Integer>();
         ArrayList<Integer> keys = new ArrayList<>();
         for(Integer key : connections.keySet()){
