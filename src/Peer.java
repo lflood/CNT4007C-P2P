@@ -1,9 +1,11 @@
 import javax.xml.crypto.Data;
 import java.io.*;
+import java.lang.reflect.Array;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 
 public class Peer {
@@ -21,6 +23,7 @@ public class Peer {
 
     private Hashtable<Integer, RemotePeer> remotePeers;
     private Hashtable<Integer, Socket> connections;
+    Hashtable<Integer, Float> peerTimes= new Hashtable<>();
 
     //Common.cfg contents
 
@@ -315,6 +318,8 @@ public class Peer {
         DataOutputStream dOut;
         boolean active;
         int remoteID;
+        long timestamp1;
+        long timestamp2;
 
         InputHandler(int remoteID){
             this.remoteID = remoteID;
@@ -328,6 +333,14 @@ public class Peer {
                     optimisticUnchokingInterval();
                 }
             }, 0, getOptimisticUnchokingInterval() * 1000);
+
+            Timer unchokingIntervalTimer = new Timer();
+            unchokingIntervalTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    unchokingInterval();
+                }
+            }, 0, getUnchokingInterval() * 1000);
         }
 
         public void run() {
@@ -385,6 +398,7 @@ public class Peer {
                                 System.out.println("bitfield message received");
                                 break;
                             case 6:
+                                timestamp1 = System.currentTimeMillis();
                                 //received a request message for a certain piece index
                                 index = dIn.readInt();
                                 //we have the piece contents below
@@ -414,10 +428,12 @@ public class Peer {
                                     byte[] haveMsg = messageHandler.getHaveMessage(index);
                                     out.write(haveMsg);
                                 }
+                                timestamp2 = System.currentTimeMillis();
+                                calculateTimeDiff(timestamp1, timestamp2, remoteID);
                                 break;
                         }
                     }else{
-                        System.out.println("NO INPUT");
+                        //System.out.println("NO INPUT");
                     }
                 }
             } catch(Exception e)
@@ -490,6 +506,118 @@ public class Peer {
         // TODO
         public void addPiece(int index, byte[] piece){
             fileHandler.setPiece(index, piece);
+        }
+
+        public long getTimeStamp1(){
+            return timestamp1;
+        }
+        public long getTimeStamp2(){
+            return timestamp2;
+        }
+
+        public Hashtable<Integer, Float> calculateTimeDiff(long time1, long time2, int remoteID){
+            ArrayList<Float> times = new ArrayList<Float>();
+            time1 = getTimeStamp1();
+            time2 = getTimeStamp2();
+            float difference = Math.abs(time2-time1);
+            times.add(difference);
+            float sum = 0;
+            for(Float time : times){
+                sum += time;
+            }
+            float avg = sum/times.size();
+            peerTimes.put(peerid, avg);
+            return peerTimes;
+        }
+        public void unchokingInterval(){
+            int[] preferredNeighbors = new int[numberOfPreferredNeighbors];
+            float min = Integer.MAX_VALUE;
+            int minPeer;
+
+            // Make list of all neighbors
+            LinkedList<RemotePeer> neighbors = new LinkedList<>();
+            for(Integer id : peerTimes.keySet()) {
+                neighbors.add(remotePeers.get(id));
+            }
+            for(int i = 0; i < numberOfPreferredNeighbors; i++){
+                minPeer = 1001;
+                for(RemotePeer neighbor : neighbors){
+
+                    float time = peerTimes.get(neighbor.getID());
+
+                    if (time < min) {
+                        min = time;
+                        minPeer = neighbor.getID();
+                    }
+                }
+                preferredNeighbors[i] = minPeer;
+                System.out.println("MinPeer: " + minPeer);
+                neighbors.remove(remotePeers.get(minPeer));
+                remotePeers.get(minPeer).preferred();
+            }
+
+            // make others not preffered
+            for(RemotePeer neighbor : neighbors) {
+
+                neighbor.notPreferred();
+            }
+            //if peer is interested and choked and preferred
+            //send unchoke message to them
+
+            for (RemotePeer neighbor : remotePeers.values()) {
+                if (neighbor.isPreferred() && neighbor.isChoked()) {
+                    byte[] unchokeMsg = messageHandler.getUnchokeMessage();
+                    try {
+                        DataOutputStream output = new DataOutputStream(connections.get(neighbor.getID()).getOutputStream());
+                        output.write(unchokeMsg);
+                        neighbor.unchoke();
+                        Log.unchoking(peerid, neighbor.getID());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } else if(!neighbor.isPreferred() && !neighbor.isChoked()){
+                    try {
+                        byte[] chokeMsg = messageHandler.getChokeMessage();
+                        DataOutputStream output = new DataOutputStream(connections.get(neighbor.getID()).getOutputStream());
+                        output.write(chokeMsg);
+                        neighbor.choke();
+                        Log.choking(peerid, neighbor.getID());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            try{
+                Log.changePreferred(peerid, preferredNeighbors);
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+        }
+
+        public void optimisticUnchokingInterval(){
+            System.out.println("finding optimistic peer to unchoke");
+            ArrayList<Integer> possibleOptimisticConnections = new ArrayList<Integer>();
+            ArrayList<Integer> keys = new ArrayList<>();
+            for(Integer key : connections.keySet()){
+                RemotePeer neighbor = remotePeers.get(key);
+                if(neighbor.isChoked() && neighbor.isInterested()){
+                    possibleOptimisticConnections.add(neighbor.getID());
+                }
+                keys.add(key);
+            }
+            Random rando = new Random();
+            if(possibleOptimisticConnections.size() > 0){
+                int randoChosenOne = Math.abs(rando.nextInt(possibleOptimisticConnections.size()));
+                //SEND UNCHOKE MESSAGE
+                byte [] unchokeMsg = messageHandler.getUnchokeMessage();
+                try{
+                    DataOutputStream output = new DataOutputStream(connections.get(randoChosenOne).getOutputStream());
+                    output.write(unchokeMsg);
+                    Log.changeOptimisticallyUnchokedNeighbor(peerid, randoChosenOne);
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -650,34 +778,6 @@ public class Peer {
         return optimisticUnchokingInterval;
     }
 
-    public void unchokingInterval(){
-
-    }
-    public void optimisticUnchokingInterval(){
-        System.out.println("finding optimistic peer to unchoke");
-        ArrayList<Integer> possibleOptimisticConnections = new ArrayList<Integer>();
-        ArrayList<Integer> keys = new ArrayList<>();
-        for(Integer key : connections.keySet()){
-            RemotePeer neighbor = remotePeers.get(key);
-            if(neighbor.isChoked() && neighbor.isInterested()){
-                possibleOptimisticConnections.add(neighbor.getID());
-            }
-            keys.add(key);
-        }
-        Random rando = new Random();
-        if(possibleOptimisticConnections.size() > 0){
-            int randoChosenOne = Math.abs(rando.nextInt(possibleOptimisticConnections.size()));
-            //SEND UNCHOKE MESSAGE
-            byte [] unchokeMsg = messageHandler.getUnchokeMessage();
-            try{
-                DataOutputStream output = new DataOutputStream(connections.get(randoChosenOne).getOutputStream());
-                output.write(unchokeMsg);
-                Log.changeOptimisticallyUnchokedNeighbor(peerid, randoChosenOne);
-            }catch(IOException e){
-                e.printStackTrace();
-            }
-        }
-    }
     public void ALLDONE(){
         fileHandler.writeFile();
     }

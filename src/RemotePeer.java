@@ -15,6 +15,7 @@ public class RemotePeer {
     private boolean bitfieldInitialized;
     private boolean chokingMe;
     private boolean interestedInMe;
+    private boolean preferred;
 
 
     //might want to pass in port maybe
@@ -25,6 +26,7 @@ public class RemotePeer {
         this.interested = false;
         this.bitfield = null;
         bitfieldInitialized = false;
+        this.preferred = false;
     }
     public int getID(){
         return ID;
@@ -140,5 +142,15 @@ public class RemotePeer {
 
     public boolean isInterested(){
         return interested;
+    }
+
+    public void preferred(){
+        preferred = true;
+    }
+    public void notPreferred(){
+        preferred = false;
+    }
+    public boolean isPreferred(){
+        return preferred;
     }
 }
