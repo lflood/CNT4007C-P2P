@@ -37,6 +37,9 @@ public class Peer {
     static String hShkHeader;
 
     private BitSet bitfield = new BitSet();
+    ClientHandler client;
+    ServerHandler server;
+    ConnectionHandler connectionHandler;
 
     /*should we have something like this below??
 
@@ -87,13 +90,12 @@ public class Peer {
             fileSize = Integer.parseInt(config[4]);
             pieceSize = Integer.parseInt(config[5]);
             numPieces = (int)Math.ceil(fileSize / (pieceSize * 1.0));
-            messageHandler = new Message(numPieces);
+            messageHandler = new Message();
             if(hasFile){
                 bitfield.set(0, numPieces);
             } else{
-                bitfield.clear(0);
+                bitfield.clear(0, numPieces);
             }
-            System.out.println("fileSize is: " + fileSize);
             fileHandler = new FileHandling(this);
         } catch (Exception e) {
             e.printStackTrace();
@@ -106,22 +108,14 @@ public class Peer {
         //parse peerInfo and then begin for loop for each server to be connected to
         //create new thread and pass in peerID, port, etc
 
-        ConnectionHandler connectionHandler = new ConnectionHandler(numberOfExpectedPeers);
+        client = new ClientHandler(peerInfo, peerNum);
+        client.start();
+
+        server = new ServerHandler();
+        server.start();
+
+        connectionHandler = new ConnectionHandler(numberOfExpectedPeers, totalPeers, peerInfo);
         connectionHandler.start();
-
-        ArrayList<ClientHandler> CH = new ArrayList<ClientHandler>(totalPeers);
-        for(int p = 0; p < (peerNum - 1); p++)
-		{
-            CH.add(new ClientHandler(peerInfo, p, true));
-            CH.get(p).start();
-		}
-
-		//TODO MAKE SURE THESE JOIN
-        // for each CH CH.join()
-        for (int i = 0; i<CH.size(); i++)
-        {
-        	CH.get(i).join();
-        }
 
         connectionHandler.join();
         connectionHandler.closeConnections();
@@ -135,8 +129,10 @@ public class Peer {
         boolean closed;
         int numConn;
         int expectedConnections;
+        int totalConnections;
+        ArrayList<String> peerInfo;
 
-        public ConnectionHandler(int expectedConnections){
+        public ConnectionHandler(int expectedConnections, int totalPeers, ArrayList<String> peerInfo){
 
             try {
 
@@ -149,16 +145,35 @@ public class Peer {
             closed = false;
             numConn = 0;
             this.expectedConnections = expectedConnections;
+            this.totalConnections = totalPeers - 1;
+            this.peerInfo = peerInfo;
         }
 
         public void run(){
+
+            for(int i = 0; i < (totalConnections - expectedConnections); i++){
+
+                try {
+                    String address = peerInfo.get(i);
+                    int peerID = Integer.parseInt(address.split(":")[0]);
+                    String hostname = address.split(":")[1];
+                    int port = Integer.parseInt(address.split(":")[2]);
+                    Socket requestSocket = new Socket(hostname, port);
+                    //socket connected
+
+                    // create remote peer class to store neighbor info
+                    remotePeers.put(peerID, new RemotePeer(peerID));
+                    connections.put(peerID, requestSocket);
+                    System.out.println("Connection stored: " + peerid + " and " + peerID);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
 
             while(numConn < expectedConnections) {
                 try {
                     Socket newConnection = listener.accept();
                     numConn++;
-                    ServerHandler SH = new ServerHandler(newConnection, true); // true cuz is connection init
-                    SH.start();
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -184,10 +199,9 @@ public class Peer {
         Socket connection;
         boolean initializing;
 
-        public ServerHandler (Socket connection, boolean initializing) throws IOException
+        public ServerHandler () throws IOException
         {
-                this.connection = connection;
-                this.initializing = initializing;
+
         }
         
         public void run() 
@@ -284,9 +298,6 @@ public class Peer {
                 remotePeers.put(clientID, new RemotePeer(clientID));
                 connections.put(clientID, connection);
                 System.out.println("Connection stored: " + peerid + " and " + clientID);
-
-                ClientRequestHandler CH = new ClientRequestHandler(connection, peerid, false);
-                CH.start();
 
             } catch(Exception ioException) {
 
@@ -470,8 +481,6 @@ public class Peer {
                 connections.put(serverID, connection);
                 System.out.println("Connection stored: " + peerid + " and " + serverID);
 
-                ServerHandler SH = new ServerHandler(connection, false);
-                SH.start();
 
             }catch(Exception ioException)
             {
@@ -496,9 +505,6 @@ public class Peer {
                 System.out.println("starting server loop");
 
                 while(true){ //have a better termination condition!
-
-                    byte [] msg = messageHandler.getInterestedMessage();
-                    dOut.write(msg);
 
                     int message_length = dIn.readInt();
                     System.out.println(message_length);
@@ -584,7 +590,7 @@ public class Peer {
             }
         }
         public boolean bitfieldIsEmpty(){
-            if(bitfield == null){
+            if(bitfield.toByteArray().length == 0){
                 return true;
             }else{
                 return false;
@@ -615,23 +621,22 @@ public class Peer {
     {
         //ASSUME YOU HAVE THE INFORMATION YOU NEED (IP , ID , PORT , ETC including the socket.)
         Socket requestSocket;
-    	int pReq;
+    	int pNum;
         ArrayList<String> peerInfo;
         String address;
         boolean initializing;
 
-        public ClientHandler(ArrayList<String> peerInfo, int pReq, boolean initializing) throws IOException
+        public ClientHandler(ArrayList<String> peerInfo, int pNum) throws IOException
         {
                 this.peerInfo = peerInfo;
-                this.pReq = pReq;
-                this.initializing = initializing;
+                this.pNum = pNum;
         }
         
         public void run() 
         {
             try
             {
-            	address = peerInfo.get(pReq);
+            	address = peerInfo.get(pNum);
             	int peerID = Integer.parseInt(address.split(":")[0]);
    	 			String hostname = address.split(":")[1];
    	            int port = Integer.parseInt(address.split(":")[2]);

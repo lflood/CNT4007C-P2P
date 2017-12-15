@@ -4,15 +4,14 @@ import java.nio.ByteBuffer;
 import java.util.BitSet;
 
 public class Message {
-	int bitfieldSize;
 	String peer;
 	int payLoadLength;
 	int type;
 	byte [] payload;
 
 
-	public Message(int bitfieldSize) {
-		this.bitfieldSize = (int)Math.ceil(bitfieldSize/8);
+	public Message() {
+
 	}
 	//have, bitfield, request, and piece message constructor
 	public Message(String peer, int payLoadLength, int type, byte [] payload){
@@ -127,7 +126,7 @@ public class Message {
 
 		int messageLength = 5;
 
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(5).array();
+		byte[] typeBytes = ByteBuffer.allocate(1).putInt(4).array();
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 		byte[] indexBytes = ByteBuffer.allocate(4).putInt(index).array(); // TODO MAKE LEGIT
 
@@ -148,9 +147,7 @@ public class Message {
 
 	public byte[] getBitfieldMessage(BitSet bitfield){
 
-		System.out.println("getBitfieldMessage()");
-
-		int messageLength = bitfieldSize + 1;
+		int messageLength = bitfield.toByteArray().length + 1;
 		byte typeBytes = 5;
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
