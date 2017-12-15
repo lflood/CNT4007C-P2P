@@ -53,7 +53,7 @@ public class Log {
     }
     public static void downloadingPiece(int peerid, int remote_peerid, int pieceIndex, int numPiecesPeerHas){
         Date date = new Date();
-        String logger = date.toString() + ": Peer " + peerid + " has downloaded the piece " + pieceIndex + "from " + remote_peerid + ". Now the number of pieces it has is " + numPiecesPeerHas + ".\n";
+        String logger = date.toString() + ": Peer " + peerid + " has downloaded the piece " + pieceIndex + " from " + remote_peerid + ". Now the number of pieces it has is " + numPiecesPeerHas + ".\n";
         saveLog(peerid, logger);
         //calculate if we have all the pieces, then call completeDownload if we do
         //otherwise call completeDownload in peer when we call ALLDONE()

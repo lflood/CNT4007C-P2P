@@ -52,11 +52,28 @@ public class RemotePeer {
         }
     }
 
-    public void updateBitfield(int index){
+    public void updateBitfield(int index, int numPieces){
+
+        if(!bitfieldInitialized){
+
+            BitSet bitSet = new BitSet();
+            bitSet.set(0, numPieces);
+            initializeBitfield(bitSet);
+            bitfieldInitialized = true;
+        }
+
         bitfield.set(index);
     }
 
     public int getRandomPieceWanted(BitSet comparisonSet, int numPieces){
+
+        if(!bitfieldInitialized){
+
+            BitSet bitSet = new BitSet();
+            bitSet.set(0, numPieces);
+            initializeBitfield(bitSet);
+            bitfieldInitialized = true;
+        }
 
         ArrayList<Integer> indexList = new ArrayList<>();
 
@@ -98,10 +115,6 @@ public class RemotePeer {
         }
 
         return result;
-    }
-
-    public void hasPiece(int index){
-        bitfield.set(index);
     }
 
     //choke variables for servers of other peers to access
