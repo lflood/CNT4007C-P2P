@@ -135,6 +135,7 @@ public class Peer {
 
         public void run(){
 
+            // SENDING CONNECTIONS
             for(int i = 0; i < (totalConnections - expectedConnections); i++){
 
                 try {
@@ -149,12 +150,13 @@ public class Peer {
                     remotePeers.put(peerID, new RemotePeer(peerID));
                     connections.put(peerID, requestSocket);
                     System.out.println("Connection created/stored: " + peerid + " and " + peerID);
-                    InputHandler IH = new InputHandler(requestSocket);
-                    IH.start();
 
                     // initiate handshake
                     handshake(requestSocket, peerID);
                     closeHandshake(peerID); // confirm correct
+
+                    InputHandler IH = new InputHandler(peerID);
+                    IH.start();
 
                     if(!bitfieldIsEmpty()){
 
@@ -166,6 +168,7 @@ public class Peer {
                 }
             }
 
+            // RECEIVING CONNECTIONS
             while(numConn < expectedConnections) {
                 try {
                     Socket newConnection = listener.accept();
@@ -181,7 +184,7 @@ public class Peer {
                     // response handshake
                     handshake(newConnection, newPeerID);
 
-                    InputHandler IH = new InputHandler(newConnection);
+                    InputHandler IH = new InputHandler(newPeerID);
                     IH.start();
 
                     if(!bitfieldIsEmpty()){
@@ -295,7 +298,7 @@ public class Peer {
         }
 
         public boolean bitfieldIsEmpty(){
-            if(bitfield == null){
+            if(bitfield.toByteArray().length == 0){
                 return true;
             }else{
                 return false;
@@ -309,11 +312,173 @@ public class Peer {
     {
         Socket connection;
         DataInputStream dIn;
+        DataOutputStream dOut;
+        boolean active;
+        int remoteID;
 
-        InputHandler(Socket connection){
-            this.connection = connection;
+        InputHandler(int remoteID){
+            this.remoteID = remoteID;
+            this.connection = connections.get(remoteID);
+            active = true;
         }
 
+        public void run() {
+
+            try {
+                dIn = new DataInputStream(connection.getInputStream());
+                dOut = new DataOutputStream(connection.getOutputStream());
+                RemotePeer neighbor = remotePeers.get(remoteID);
+                int index;
+
+                while (active) { //have a better termination condition!
+                    int message_length = dIn.readInt();
+                    System.out.println("incoming message length: " + message_length);
+                    byte message_type = dIn.readByte();
+                    System.out.println(message_type);
+                    byte[] message_payload;
+                    switch (message_type) {
+                        //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
+                        case 0:
+                            chokeMe(remoteID, peerid);
+                            break;
+                        case 1:
+                            index = dIn.readInt();
+                            unchokeMe(remoteID, peerid);
+                            byte [] requestMsg = messageHandler.getRequestMessage(index);
+                            dOut.write(requestMsg);
+                            break;
+                        case 2:
+                            interestedMe(peerid, remoteID);
+                            System.out.println(peerid + ": Interested message from " + remoteID);
+                            break;
+                        case 3:
+                            notInterestedMe(peerid, remoteID);
+                            break;
+                        case 4:
+                            index = dIn.readInt();
+                            neighbor.hasPiece(index);
+                            Log.have(remoteID, peerid, index);
+                            //determine to send interested message or not
+                            for(int i = 0; i < bitfield.size(); i++){
+                                //if peer does not have piece and neighbor does, then send interested msg
+                                if(!bitfield.get(i) && neighbor.getBitfield().get(i)){
+                                    byte [] interestedMsg = messageHandler.getInterestedMessage();
+                                    dOut.write(interestedMsg);
+                                }
+                            }
+                            break;
+                        case 5:
+                            message_payload = new byte[message_length - 1];
+                            dIn.readFully(message_payload);
+                            neighbor = remotePeers.get(remoteID);
+                            BitSet initBitfield = BitSet.valueOf(message_payload);
+                            neighbor.initializeBitfield(initBitfield);
+                            System.out.println("bitfield message received");
+                            break;
+                        case 6:
+                            //received a request message for a certain piece index
+                            index = dIn.readInt();
+                            //we have the piece contents below
+                            // if client not choked, send piece
+                            //TODO add check for choked
+                            if (!neighbor.isChoked()) {
+                                //check if neighbor is preferred
+                                //check if optimistically unchoked neighbor changed
+                                //because peer might've been choked during that change
+                                byte[] piece = getPiece(index);
+                                //we parse the data into the pieceMsg format
+                                byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
+                                //send it out to our remote peer
+                                dOut.write(pieceMsg);
+                            }
+                            break;
+                        case 7:
+                            index = dIn.readInt();
+                            message_payload = new byte[message_length-5]; //this is the piece contents
+                            dIn.readFully(message_payload);
+                            addPiece(index, message_payload);
+                            Log.downloadingPiece(remoteID, peerid, index, fileHandler.numPiecesPeerHas());
+
+                            //send have message to other remote peers to update their bitfields of what we have
+                            for(Integer key : connections.keySet()){
+                                DataOutputStream out = new DataOutputStream(connections.get(key).getOutputStream());
+                                byte [] haveMsg = messageHandler.getHaveMessage(index);
+                                out.write(haveMsg);
+                            }
+                            break;
+                    }
+                }
+            } catch(Exception e)
+            {
+                e.printStackTrace();
+            }
+        }
+
+        public void close(){
+            active = false;
+        }
+
+
+        //case functions
+        public void interestedMe(int neighborID, int peerid){
+            RemotePeer neighbor = remotePeers.get(neighborID);
+            neighbor.isInterestedMe();
+            //the neighbor that choked us will now save that we are choked
+            try{
+                Log.interested(peerid, neighborID);
+            }catch(IOException e){
+                System.out.println(e.toString());
+            }
+        }
+        public void notInterestedMe(int neighborID, int peerid) {
+            RemotePeer neighbor = remotePeers.get(neighborID);
+            neighbor.isNotInterestedMe();
+            try {
+                Log.uninterested(peerid, neighborID);
+            } catch (IOException e) {
+                System.out.println(e.toString());
+            }
+        }
+
+        public void chokeMe(int neighborID, int peerid){
+            RemotePeer neighbor = remotePeers.get(neighborID);
+            neighbor.isChokingMe();
+            try{
+                Log.choking(peerid, neighborID);
+            }catch(IOException e){
+                System.out.println(e.toString());
+            }
+        }
+
+        public void unchokeMe(int neighborID, int peerid){
+            RemotePeer neighbor = remotePeers.get(neighborID);
+            neighbor.isUnchokingMe();
+            try{
+                Log.unchoking(peerid, neighborID);
+            }catch(IOException e){
+                System.out.println(e.toString());
+            }
+        }
+
+        // TODO
+        public byte[] getPiece(int index){
+            return fileHandler.getPiece(index);
+        }
+
+        // TODO
+        public boolean peerUpdated(){
+            return false;
+        }
+
+        // TODO
+        public void sendUpdateMessages(){
+
+        }
+
+        // TODO
+        public void addPiece(int index, byte[] piece){
+            fileHandler.setPiece(index, piece);
+        }
     }
 
 
@@ -374,171 +539,7 @@ public class Peer {
                     this.initializing =initializing;
         }
 
-        public void init(){
-
-            try {
-                HandShakeMessage hMsg = new HandShakeMessage();
-                //Utility.SendMsg(mySocket,Msg)//synchronized on the socket level so that only one can write to the socket at the same time
-
-                // SEND HANDSHAKE
-                byte[] handshake = hMsg.getByteMessage(hShkHeader, peerid);
-
-                dOut = new DataOutputStream(connection.getOutputStream());
-
-                dOut.writeInt(handshake.length); // write length of the message
-                dOut.write(handshake);           // write the message
-
-                // RECEIVE HANDSHAKE
-                dIn = new DataInputStream(connection.getInputStream());
-
-                int length = dIn.readInt();
-                if (length > 0) {
-
-                    byte[] message = new byte[length];
-                    dIn.readFully(message, 0, message.length); // read the message
-
-                    clientID = hMsg.accept(message);
-                }
-
-                // add newly connected peer to RemotePeers
-                if (!bitfieldIsEmpty()) {
-                    System.out.println(bitfieldIsEmpty());
-                    byte[] msg = messageHandler.getBitfieldMessage(bitfield);
-
-                    dOut.write(msg);           // write the message
-                }
-
-                // create remote peer class to store neighbor info
-                remotePeers.put(clientID, new RemotePeer(clientID));
-                connections.put(clientID, connection);
-                System.out.println("Connection stored: " + peerid + " and " + clientID);
-
-            } catch(Exception ioException) {
-
-            }
-        }
-
-        public void run()
-        {
-            try {
-
-                if(initializing){
-                    init();
-                }
-
-                //start while loop for receiving messages
-                //have a separate thread to send message that dies
-
-                RemotePeer neighbor = remotePeers.get(clientID);
-                int index;
-
-
-                Timer optimisticUnchokingIntervalTimer = new Timer();
-                optimisticUnchokingIntervalTimer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        optimisticUnchokingInterval();
-                    }
-                }, 0, getOptimisticUnchokingInterval() * 1000);
-
-
-
-                System.out.println("starting server loop");
-
-                while(true){ //have a better termination condition!
-                    int message_length = dIn.readInt();
-                    System.out.println("from server: " + message_length);
-                    byte message_type = dIn.readByte();
-                    System.out.println(message_type);
-                    byte[] message_payload;
-                    switch(message_type){
-                        //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
-                        case 2:
-                            interestedMe(peerid, clientID);
-                            System.out.println(peerid + ": Interested message from " + clientID);
-                            break;
-                        case 3:
-                            notInterestedMe(peerid, clientID);
-                            break;
-                        case 5:
-                            message_payload = new byte[message_length - 1];
-                            dIn.readFully(message_payload);
-                            neighbor = remotePeers.get(clientID);
-                            BitSet initBitfield = BitSet.valueOf(message_payload);
-                            neighbor.initializeBitfield(initBitfield);
-                            System.out.println("bitfield message received");
-                            break;
-                        case 6:
-                            //received a request message for a certain piece index
-                            index = dIn.readInt();
-                            //we have the piece contents below
-                            // if client not choked, send piece
-                            //TODO add check for choked
-                            if(!neighbor.isChoked()){
-                                //check if neighbor is preferred
-                                //check if optimistically unchoked neighbor changed
-                                //because peer might've been choked during that change
-                                byte[] piece = getPiece(index);
-                                //we parse the data into the pieceMsg format
-                                byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
-                                //send it out to our remote peer
-                                dOut.write(pieceMsg);
-                            }
-                            break;
-                        }
-                }
-            }
-            catch(Exception ioException)
-            {
-
-            }
-            finally
-            {
-
-            }
-        }
-
-        //case functions
-        public void interestedMe(int neighborID, int peerid){
-            RemotePeer neighbor = remotePeers.get(neighborID);
-            neighbor.isInterestedMe();
-            //the neighbor that choked us will now save that we are choked
-            try{
-                Log.interested(peerid, neighborID);
-            }catch(IOException e){
-                System.out.println(e.toString());
-            }
-        }
-        public void notInterestedMe(int neighborID, int peerid) {
-            RemotePeer neighbor = remotePeers.get(neighborID);
-            neighbor.isNotInterestedMe();
-            try {
-                Log.uninterested(peerid, neighborID);
-            } catch (IOException e) {
-                System.out.println(e.toString());
-            }
-        }
-        public boolean bitfieldIsEmpty(){
-            if(bitfield == null){
-                return true;
-            }else{
-                return false;
-            }
-        }
-
-        // TODO
-        public byte[] getPiece(int index){
-            return fileHandler.getPiece(index);
-        }
-
-        // TODO
-        public boolean peerUpdated(){
-            return false;
-        }
-
-        // TODO
-        public void sendUpdateMessages(){
-
+        public void run() {
         }
     }
 
@@ -559,177 +560,10 @@ public class Peer {
             this.initializing = initializing;
         }
 
-        public void init(){
-
-            try{
-                HandShakeMessage hMsg = new HandShakeMessage();
-                int recepientID = 0;
-                //Utility.SendMsg(mySocket,Msg)//synchronized on the socket level so that only one can write to the socket at the same time
-
-                // SEND HANDSHAKE
-                byte[] handshake = hMsg.getByteMessage(hShkHeader, peerid);
-
-                dOut = new DataOutputStream(connection.getOutputStream());
-
-                dOut.writeInt(handshake.length); // write length of the message
-                dOut.write(handshake);           // write the message
-
-                // RECEIVE HANDSHAKE
-                dIn = new DataInputStream(connection.getInputStream());
-
-                int length = dIn.readInt();
-                if (length > 0) {
-
-                    handshake = new byte[length];
-                    dIn.readFully(handshake, 0, handshake.length); // read the message
-
-                    recepientID = hMsg.accept(handshake);
-                    Log.madetcpConnection(peerid, recepientID);
-                    Log.accepttcpConnection(recepientID, peerid);
-
-                    if(serverID != recepientID){
-
-                        System.out.println("Error: incorrect peerID");
-                        // exit thread, connection incorrect
-                    }
-                }
-
-                if(!bitfieldIsEmpty()) {
-                    byte[] msg = messageHandler.getBitfieldMessage(bitfield);
-                    dOut.write(msg);    // write the message
-                }
-
-                // create remote peer class to store neighbor info
-                remotePeers.put(serverID, new RemotePeer(serverID));
-                connections.put(serverID, connection);
-                System.out.println("Connection stored: " + peerid + " and " + serverID);
-
-
-            }catch(Exception ioException)
-            {
-
-            }
-        }
-
         public void run()
         {
-            try {
 
-                if(initializing){
-                    init();
-                }
-
-                //start while loop for receiving messages
-                //have a separate thread to send message that dies
-
-                RemotePeer neighbor = remotePeers.get(serverID);
-                int index;
-
-                System.out.println("starting client loop");
-
-                while(true){ //have a better termination condition!
-                    
-                    int message_length = dIn.readInt();
-                    System.out.println("from client: " + message_length);
-                    byte message_type = dIn.readByte();
-                    System.out.println(message_type);
-                    byte[] message_payload;
-                    switch(message_type){
-                        case 0:
-                            chokeMe(serverID, peerid);
-                            break;
-                        case 1:
-                            index = dIn.readInt();
-                            unchokeMe(serverID, peerid);
-                            byte [] requestMsg = messageHandler.getRequestMessage(index);
-                            dOut.write(requestMsg);
-                            break;
-                        case 4:
-                            index = dIn.readInt();
-                            neighbor.hasPiece(index);
-                            Log.have(serverID, peerid, index);
-                            //determine to send interested message or not
-                            for(int i = 0; i < bitfield.size(); i++){
-                                //if peer does not have piece and neighbor does, then send interested msg
-                                if(!bitfield.get(i) && neighbor.getBitfield().get(i)){
-                                    byte [] interestedMsg = messageHandler.getInterestedMessage();
-                                    dOut.write(interestedMsg);
-                                }
-                            }
-                            break;
-                        case 5:
-                            message_payload = new byte[message_length - 1];
-                            dIn.readFully(message_payload);
-                            neighbor = remotePeers.get(serverID);
-                            BitSet initBitfield = BitSet.valueOf(message_payload);
-                            neighbor.initializeBitfield(initBitfield);
-                            System.out.println("bitfield message received");
-                            break;
-                        case 7:
-                            index = dIn.readInt();
-                            message_payload = new byte[message_length-5]; //this is the piece contents
-                            dIn.readFully(message_payload);
-                            addPiece(index, message_payload);
-                            Log.downloadingPiece(serverID, peerid, index, fileHandler.numPiecesPeerHas());
-
-                            //send have message to other remote peers to update their bitfields of what we have
-                            for(Integer key : connections.keySet()){
-                                DataOutputStream out = new DataOutputStream(connections.get(key).getOutputStream());
-                                byte [] haveMsg = messageHandler.getHaveMessage(index);
-                                out.write(haveMsg);
-                            }
-                            break;
-                    }
-                }
-            }
-            catch(Exception ioException)
-            {
-
-            }
-            finally
-            {
-
-            }
         }
-
-        //case functions
-        public void chokeMe(int neighborID, int peerid){
-            RemotePeer neighbor = remotePeers.get(neighborID);
-            neighbor.isChokingMe();
-            try{
-                Log.choking(peerid, neighborID);
-            }catch(IOException e){
-                System.out.println(e.toString());
-            }
-        }
-
-        public void unchokeMe(int neighborID, int peerid){
-            RemotePeer neighbor = remotePeers.get(neighborID);
-            neighbor.isUnchokingMe();
-            try{
-                Log.unchoking(peerid, neighborID);
-            }catch(IOException e){
-                System.out.println(e.toString());
-            }
-        }
-        public boolean bitfieldIsEmpty(){
-            if(bitfield.toByteArray().length == 0){
-                return true;
-            }else{
-                return false;
-            }
-        }
-
-        // TODO
-        public byte[] getPiece(int index){
-            return fileHandler.getPiece(index);
-        }
-
-        // TODO
-        public void addPiece(int index, byte[] piece){
-            fileHandler.setPiece(index, piece);
-        }
-
         public int findNewPieceIndex(int peerid){
             RemotePeer neighbor = remotePeers.get(peerid);
             return neighbor.getRandomPieceWanted(bitfield);
