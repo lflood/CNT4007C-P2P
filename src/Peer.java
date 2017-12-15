@@ -22,6 +22,7 @@ public class Peer {
     private FileHandling fileHandler;
     private RemotePeer optUnchoked;
     private boolean timingTaken;
+    private boolean start;
 
     private Hashtable<Integer, RemotePeer> remotePeers;
     private Hashtable<Integer, Socket> connections;
@@ -52,6 +53,7 @@ public class Peer {
         this.targNum = peerNum;
 
         timingTaken = false;
+        start = false;
 
         hShkHeader = "P2PFILESHARINGPROJ";
         numberOfExpectedPeers = totalPeers - peerNum;
@@ -107,12 +109,12 @@ public class Peer {
         //client.start();
 
         server = new ServerHandler();
-        server.start();
 
         connectionHandler = new ConnectionHandler(numberOfExpectedPeers, totalPeers, peerInfo);
         connectionHandler.start();
 
         connectionHandler.join();
+        server.start();
 
         connectionHandler.closeConnections();
     }
@@ -173,7 +175,8 @@ public class Peer {
                     closeHandshake(peerID); // confirm correct
 
                     InputHandler IH = new InputHandler(peerID);
-                    IH.start();
+                    //IH.start();
+                    server.addInput(IH);
 
                     if(!timerStarted){
                         timerStarted = true;
@@ -209,16 +212,12 @@ public class Peer {
                     handshake(newConnection, newPeerID);
 
                     InputHandler IH = new InputHandler(newPeerID);
-                    IH.start();
+                    server.addInput(IH);
+                    //IH.start();
 
                     if(!timerStarted){
                         timerStarted = true;
                         TH.start();
-                    }
-
-                    if(!bitfieldIsEmpty()){
-
-                        sendBitfield(newConnection);
                     }
 
                 } catch (Exception e) {
@@ -385,6 +384,12 @@ public class Peer {
 
         public void run() {
             try {
+
+                if(!bitfieldIsEmpty()){
+
+                    sendBitfield(connection);
+                }
+
                 dIn = new DataInputStream(connection.getInputStream());
                 dOut = new DataOutputStream(connection.getOutputStream());
                 RemotePeer neighbor = remotePeers.get(remoteID);
@@ -398,6 +403,21 @@ public class Peer {
                         System.out.println(message_type);
                         byte[] message_payload;
 
+                        int counter = 0;
+                            for(RemotePeer friend : remotePeers.values()){
+                                if(friend.hasBitfield()){
+                                    System.out.println("Peer Cardinality: " + friend.getBitfield().cardinality());
+                                    if(friend.getBitfield().cardinality() == numPieces){
+                                        counter++;
+                                        System.out.println("Count: " + counter);
+                                    }
+                                }
+                            }
+
+                        if(counter == 3 && bitfield.cardinality() == numPieces){
+                            ALLDONE();
+                            close();
+                        }
 
 
                         switch (message_type) {
@@ -467,7 +487,7 @@ public class Peer {
                                     //because peer might've been choked during that change
                                     byte[] piece = getPiece(index);
                                     //we parse the data into the pieceMsg format
-                                    byte[] pieceMsg = messageHandler.getPieceMessage(index, piece, pieceSize);
+                                    byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
                                     //send it out to our remote peer
                                     writeMessage(dOut, remoteID, pieceMsg);
                                     System.out.println(peerid + ": Request for piece " + index + " from " + remoteID);
@@ -479,6 +499,22 @@ public class Peer {
                                 dIn.readFully(message_payload);
                                 addPiece(index, message_payload);
                                 Log.downloadingPiece(peerid, remoteID, index, fileHandler.numPiecesPeerHas());
+
+                                if(index == 304) {
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
+                                    System.out.println("Last Piece requested. Piece size = " + message_payload.length);
+                                    System.out.println(getPiece(304).length);
+                                }
+
 
                                 //send have message to other remote peers to update their bitfields of what we have
                                 for (Integer key : connections.keySet()) {
@@ -599,6 +635,28 @@ public class Peer {
             return false;
         }
 
+        public void sendBitfield(Socket connection){
+
+            try {
+                DataOutputStream dOut = new DataOutputStream(connection.getOutputStream());
+
+                byte[] msg = messageHandler.getBitfieldMessage(bitfield);
+
+                dOut.write(msg);           // write the message
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public boolean bitfieldIsEmpty(){
+            if(bitfield.toByteArray().length == 0){
+                return true;
+            }else{
+                return false;
+            }
+        }
+
         public int findNewPieceIndex(int peerid) {
             RemotePeer neighbor = remotePeers.get(peerid);
             return neighbor.getRandomPieceWanted(bitfield, numPieces);
@@ -639,10 +697,11 @@ public class Peer {
     {
         Socket connection;
         boolean initializing;
+        ArrayList<InputHandler> inputs;
 
         public ServerHandler () throws IOException
         {
-
+            inputs = new ArrayList<>();
         }
         
         public void run() 
@@ -650,6 +709,10 @@ public class Peer {
             try
             {
                 System.out.println("The server is running.");
+
+                for(InputHandler IH : inputs){
+                    IH.start();
+                }
 
                 try 
                 {
@@ -668,6 +731,10 @@ public class Peer {
             {
             
             }
+        }
+
+        public void addInput(InputHandler IH){
+            inputs.add(IH);
         }
 
         public void doStuff(){

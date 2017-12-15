@@ -69,15 +69,22 @@ public class FileHandling {
         }
 
         for(int i = 0; i < numPieces; i++){
-            byte [] pieceData = new byte[peer.pieceSize];
-            for(int j = 0; j < peer.pieceSize; j++){
-                int fileIndex = i*pieceData.length;
+
+            byte [] pieceData;
+
+            if((i*peer.pieceSize + peer.pieceSize) > fileSize){
+
+                pieceData = new byte[fileSize - (i * peer.pieceSize)];
+
+
+            }else{
+                pieceData = new byte[peer.pieceSize];
+            }
+
+            for(int j = 0; j < pieceData.length; j++){
+                int fileIndex = i*peer.pieceSize;
                 fileIndex += j;
-                if(fileIndex >= fileContents.length){
-                    pieceData[j] = (byte)0;
-                }else{
-                    pieceData[j] = fileContents[fileIndex];
-                }
+                pieceData[j] = fileContents[fileIndex];
             }
             pieces.add(new Piece(pieceData));
         }
@@ -86,6 +93,8 @@ public class FileHandling {
     public void writeFile(){
         int numPieces = peer.getNumPieces();
         int fileSize = peer.getFileSize();
+
+        byte[] data = pieces.get(304).getPieceData();
 
         byte [] fileDone = new byte [fileSize];
         int curr = 0;
@@ -117,7 +126,11 @@ public class FileHandling {
         return pieces.get(index).getPieceData();
     }
     public void setPiece(int index, byte [] piece) {
-        this.pieces.set(index, new Piece (piece));
+
+        if(index == 304) {
+            System.out.println("Setting last piece to size: " + piece.length);
+        }
+        this.pieces.set(index, new Piece(piece));
         currentTotalPiecesPeerHas++;
     }
     public int numPiecesPeerHas(){
