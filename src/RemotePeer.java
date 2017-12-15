@@ -85,10 +85,13 @@ public class RemotePeer {
 
         Random random = new Random();
 
-        int listIndex = random.nextInt(indexList.size());
-        int pieceIndex = indexList.get(listIndex);
-
-        return pieceIndex;
+        int listIndex;
+        if(indexList.size() > 0) {
+            listIndex = random.nextInt(indexList.size());
+        }else{
+            return 0;
+        }
+        return indexList.get(listIndex);
     }
 
     public boolean hasBitfield(){

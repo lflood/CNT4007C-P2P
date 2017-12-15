@@ -48,7 +48,7 @@ public class Log {
     }
     public static void have(int peerid, int remote_peerid, int pieceIndex){
         Date date = new Date();
-        String logger = date.toString() + ": Peer " + peerid + " received the 'have' message from peer " + remote_peerid + "for the piece " + pieceIndex + ".\n";
+        String logger = date.toString() + ": Peer " + peerid + " received the 'have' message from peer " + remote_peerid + " for the piece " + pieceIndex + ".\n";
         saveLog(peerid, logger);
     }
     public static void downloadingPiece(int peerid, int remote_peerid, int pieceIndex, int numPiecesPeerHas){

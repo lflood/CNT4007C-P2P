@@ -114,8 +114,6 @@ public class Peer {
 
         connectionHandler.join();
 
-        server.doStuff();
-
         connectionHandler.closeConnections();
     }
 
@@ -386,7 +384,6 @@ public class Peer {
         }
 
         public void run() {
-            System.out.println("made it in the input handler");
             try {
                 dIn = new DataInputStream(connection.getInputStream());
                 dOut = new DataOutputStream(connection.getOutputStream());
@@ -448,7 +445,7 @@ public class Peer {
                                 neighbor.initializeBitfield(initBitfield);
                                 System.out.println(initBitfield.toString());
                                 System.out.println(neighbor.getBitfield().toString());
-                                System.out.println("bitfield message received");
+                                System.out.println("bitfield message received from " + remoteID);
 
                                 // check if interested
                                 if(checkInterest(remoteID) && !hasFile){
@@ -470,9 +467,10 @@ public class Peer {
                                     //because peer might've been choked during that change
                                     byte[] piece = getPiece(index);
                                     //we parse the data into the pieceMsg format
-                                    byte[] pieceMsg = messageHandler.getPieceMessage(index, piece);
+                                    byte[] pieceMsg = messageHandler.getPieceMessage(index, piece, pieceSize);
                                     //send it out to our remote peer
                                     writeMessage(dOut, remoteID, pieceMsg);
+                                    System.out.println(peerid + ": Request for piece " + index + " from " + remoteID);
                                 }
                                 break;
                             case 7:
@@ -578,9 +576,9 @@ public class Peer {
 
         }
 
-        // TODO
         public void addPiece(int index, byte[] piece){
             fileHandler.setPiece(index, piece);
+            bitfield.set(index);
         }
 
         public boolean checkInterest(int pid){

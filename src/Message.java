@@ -189,8 +189,9 @@ public class Message {
 		return result;
 	}
 
-	public byte[] getPieceMessage(int index, byte[] piece){
-		int messageLength = 5;
+	public byte[] getPieceMessage(int index, byte[] piece, int pieceSize){
+
+		int messageLength = pieceSize + 5;
 
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 		byte typeBytes = 7;
