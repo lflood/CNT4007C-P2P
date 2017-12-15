@@ -92,11 +92,11 @@ public class Peer {
         //parse peerInfo and then begin for loop for each server to be connected to
         //create new thread and pass in peerID, port, etc
 
-        client = new ClientHandler(peerInfo, peerNum);
-        client.start();
+        //client = new ClientHandler(peerInfo, peerNum);
+        //client.start();
 
-        server = new ServerHandler();
-        server.start();
+        //server = new ServerHandler();
+        //server.start();
 
         connectionHandler = new ConnectionHandler(numberOfExpectedPeers, totalPeers, peerInfo);
         connectionHandler.start();
@@ -148,7 +148,19 @@ public class Peer {
                     // create remote peer class to store neighbor info
                     remotePeers.put(peerID, new RemotePeer(peerID));
                     connections.put(peerID, requestSocket);
-                    System.out.println("Connection stored: " + peerid + " and " + peerID);
+                    System.out.println("Connection created/stored: " + peerid + " and " + peerID);
+                    InputHandler IH = new InputHandler(requestSocket);
+                    IH.start();
+
+                    // initiate handshake
+                    handshake(requestSocket, peerID);
+                    closeHandshake(peerID); // confirm correct
+
+                    if(!bitfieldIsEmpty()){
+
+                        sendBitfield(requestSocket);
+                    }
+
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -158,6 +170,24 @@ public class Peer {
                 try {
                     Socket newConnection = listener.accept();
                     numConn++;
+
+                    int newPeerID = acceptHandshake(newConnection);
+                    Log.accepttcpConnection(newPeerID, peerid);
+                    // create remote peer class to store neighbor info
+                    remotePeers.put(newPeerID, new RemotePeer(newPeerID));
+                    connections.put(newPeerID, newConnection);
+                    System.out.println("Connection created/stored: " + peerid + " and " + newPeerID);
+
+                    // response handshake
+                    handshake(newConnection, newPeerID);
+
+                    InputHandler IH = new InputHandler(newConnection);
+                    IH.start();
+
+                    if(!bitfieldIsEmpty()){
+
+                        sendBitfield(newConnection);
+                    }
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -174,7 +204,118 @@ public class Peer {
                 e.printStackTrace();
             }
         }
+
+        public void handshake(Socket connection, int pid){
+
+            try {
+                HandShakeMessage hMsg = new HandShakeMessage();
+                //Utility.SendMsg(mySocket,Msg)//synchronized on the socket level so that only one can write to the socket at the same time
+
+                // SEND HANDSHAKE
+                byte[] handshake = hMsg.getByteMessage(hShkHeader, peerid);
+
+                DataOutputStream dOut = new DataOutputStream(connection.getOutputStream());
+
+                dOut.writeInt(handshake.length); // write length of the message
+                dOut.write(handshake);           // write the message
+
+                Log.madetcpConnection(peerid, pid);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public int acceptHandshake(Socket connection){
+
+            int newPeerID = -1;
+
+            try {
+                HandShakeMessage hMsg = new HandShakeMessage();
+
+                DataInputStream dIn = new DataInputStream(connection.getInputStream());
+
+                int length = dIn.readInt();
+                if (length > 0) {
+
+                    byte[] message = new byte[length];
+                    dIn.readFully(message, 0, message.length); // read the message
+
+                    newPeerID = hMsg.accept(message);
+
+                    return newPeerID;
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            return newPeerID;
+        }
+
+        public void closeHandshake(int pid){
+
+            HandShakeMessage hMsg = new HandShakeMessage();
+
+            try {
+                DataInputStream dIn = new DataInputStream(connections.get(pid).getInputStream());
+
+                int length = dIn.readInt();
+                if (length > 0) {
+
+                    byte[] handshake = new byte[length];
+                    dIn.readFully(handshake, 0, handshake.length); // read the message
+
+                    int responseID = hMsg.accept(handshake);
+                    Log.accepttcpConnection(pid, peerid);
+
+                    if (responseID != pid) {
+
+                        System.out.println("Error: incorrect peerID");
+                        // TODO exit thread, connection incorrect
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void sendBitfield(Socket connection){
+
+            try {
+                DataOutputStream dOut = new DataOutputStream(connection.getOutputStream());
+
+                byte[] msg = messageHandler.getBitfieldMessage(bitfield);
+
+                dOut.write(msg);           // write the message
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public boolean bitfieldIsEmpty(){
+            if(bitfield == null){
+                return true;
+            }else{
+                return false;
+            }
+        }
     }
+
+/////////////////////////////
+
+    private class InputHandler extends Thread
+    {
+        Socket connection;
+        DataInputStream dIn;
+
+        InputHandler(Socket connection){
+            this.connection = connection;
+        }
+
+    }
+
 
 /////////////////////////////
     
