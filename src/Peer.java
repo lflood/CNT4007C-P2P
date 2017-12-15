@@ -1,12 +1,9 @@
+import javax.xml.crypto.Data;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.HashSet;
-import java.util.Hashtable;
-
+import java.util.*;
 
 
 public class Peer {
@@ -40,15 +37,6 @@ public class Peer {
     ClientHandler client;
     ServerHandler server;
     ConnectionHandler connectionHandler;
-
-    /*should we have something like this below??
-
-    private static int port;
-    private static boolean hasFile;
-    private static int
-    public static final Peer peer = new peer(peerid, port, hasFile, peerInfo, counter);
-    public static Peer getPeer() {return peer}
-    */
 
     public Peer(int peerid, int port, boolean hasFile, ArrayList<String> peerInfo, int peerNum, int totalPeers) throws IOException, InterruptedException {
         this.peerid = peerid;
@@ -100,10 +88,6 @@ public class Peer {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-
-        //currently hard coded for how many connections it expects. Needs to be changed.
-        //assign above to variable first so you can start variable and also join
 
         //parse peerInfo and then begin for loop for each server to be connected to
         //create new thread and pass in peerID, port, etc
@@ -215,17 +199,6 @@ public class Peer {
                     ServerRequestHandler RH = new ServerRequestHandler(connection, initializing);
                     RH.start();
                     System.out.println("Client is connected!");
-
-                    /*
-                   // define RH somewhere and allocate enough memory or use arraylist append!
-                    while(numConn < expectedClients) {
-                        Socket accepted = listener.accept();
-
-                        RH.add(new ServerRequestHandler(accepted));   //add the flag bit indicating whether they shook hands or not
-                        RH.get(numConn).start();
-                        numConn++;
-                        System.out.println("Client is connected!");
-                    }*/
                 } 
                 finally 
                 {
@@ -318,11 +291,22 @@ public class Peer {
                 RemotePeer neighbor = remotePeers.get(clientID);
                 int index;
 
+
+                Timer optimisticUnchokingIntervalTimer = new Timer();
+                optimisticUnchokingIntervalTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        optimisticUnchokingInterval();
+                    }
+                }, 0, getOptimisticUnchokingInterval() * 1000);
+
+
+
                 System.out.println("starting server loop");
 
                 while(true){ //have a better termination condition!
                     int message_length = dIn.readInt();
-                    System.out.println(message_length);
+                    System.out.println("from server: " + message_length);
                     byte message_type = dIn.readByte();
                     System.out.println(message_type);
                     byte[] message_payload;
@@ -470,10 +454,8 @@ public class Peer {
                 }
 
                 if(!bitfieldIsEmpty()) {
-
                     byte[] msg = messageHandler.getBitfieldMessage(bitfield);
-
-                    dOut.write(msg);           // write the message
+                    dOut.write(msg);    // write the message
                 }
 
                 // create remote peer class to store neighbor info
@@ -502,12 +484,12 @@ public class Peer {
                 RemotePeer neighbor = remotePeers.get(serverID);
                 int index;
 
-                System.out.println("starting server loop");
+                System.out.println("starting client loop");
 
                 while(true){ //have a better termination condition!
-
+                    
                     int message_length = dIn.readInt();
-                    System.out.println(message_length);
+                    System.out.println("from client: " + message_length);
                     byte message_type = dIn.readByte();
                     System.out.println(message_type);
                     byte[] message_payload;
@@ -674,14 +656,40 @@ public class Peer {
     public int getNumPieces(){
         return numPieces;
     }
-
-    public void optimisticUnchokingInterval(){
-
+    public int getUnchokingInterval(){
+        return unchokingInterval;
     }
+    public int getOptimisticUnchokingInterval(){
+        return optimisticUnchokingInterval;
+    }
+
     public void unchokingInterval(){
 
     }
-
+    public void optimisticUnchokingInterval(){
+        ArrayList<Integer> possibleOptimisticConnections = new ArrayList<Integer>();
+        ArrayList<Integer> keys = new ArrayList<>();
+        for(Integer key : connections.keySet()){
+            RemotePeer neighbor = remotePeers.get(key);
+            if(neighbor.isChoked() && neighbor.isInterested()){
+                possibleOptimisticConnections.add(neighbor.getID());
+            }
+            keys.add(key);
+        }
+        Random rando = new Random();
+        if(possibleOptimisticConnections.size() > 0){
+            int randoChosenOne = Math.abs(rando.nextInt(possibleOptimisticConnections.size()));
+            //SEND UNCHOKE MESSAGE
+            byte [] unchokeMsg = messageHandler.getUnchokeMessage();
+            try{
+                DataOutputStream output = new DataOutputStream(connections.get(randoChosenOne).getOutputStream());
+                output.write(unchokeMsg);
+                Log.changeOptimisticallyUnchokedNeighbor(peerid, randoChosenOne);
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+        }
+    }
     public void ALLDONE(){
         fileHandler.writeFile();
     }
