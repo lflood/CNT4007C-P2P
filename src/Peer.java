@@ -406,17 +406,17 @@ public class Peer {
                         int counter = 0;
                             for(RemotePeer friend : remotePeers.values()){
                                 if(friend.hasBitfield()){
-                                    System.out.println("Peer Cardinality: " + friend.getBitfield().cardinality());
                                     if(friend.getBitfield().cardinality() == numPieces){
                                         counter++;
-                                        System.out.println("Count: " + counter);
                                     }
                                 }
                             }
 
-                        if(counter == 3 && bitfield.cardinality() == numPieces){
+                        if(bitfield.cardinality() == numPieces && !hasFile){
+
+                            hasFile = true;
                             ALLDONE();
-                            close();
+                            //close();
                         }
 
 
@@ -428,15 +428,27 @@ public class Peer {
                             case 1:
                                 unchokeMe(remoteID, peerid);
 
-                                index = findNewPieceIndex(remoteID);
-                                byte[] requestMsg = messageHandler.getRequestMessage(index);
-                                writeMessage(dOut, remoteID, requestMsg);
+                                if (neighbor.isInterested()){
+                                    index = findNewPieceIndex(remoteID);
+                                    byte[] requestMsg = messageHandler.getRequestMessage(index);
+                                    writeMessage(dOut, remoteID, requestMsg);
+                                }else{
+                                    byte[] msg = messageHandler.getNotInterestedMessage();
+                                    writeMessage(dOut, remoteID, msg);
+                                }
                                 break;
                             case 2:
                                 interestedMe(remoteID, peerid);
                                 break;
                             case 3:
                                 notInterestedMe(remoteID, peerid);
+
+                                if(!neighbor.isChoked()){
+                                    neighbor.choke();
+
+                                    byte[] data = messageHandler.getChokeMessage();
+                                    writeMessage(dOut, remoteID, data);
+                                }
                                 break;
                             case 4:
                                 index = dIn.readInt();
@@ -471,6 +483,7 @@ public class Peer {
                                 if(checkInterest(remoteID) && !hasFile){
 
                                     byte[] msg = messageHandler.getInterestedMessage();
+                                    neighbor.interested();
 
                                     writeMessage(dOut, remoteID, msg);
                                 }
@@ -497,30 +510,18 @@ public class Peer {
                                 index = dIn.readInt();
                                 message_payload = new byte[message_length - 5]; //this is the piece contents
                                 dIn.readFully(message_payload);
-                                addPiece(index, message_payload);
-                                Log.downloadingPiece(peerid, remoteID, index, fileHandler.numPiecesPeerHas());
 
-                                if(index == 304) {
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH");
-                                    System.out.println("Last Piece requested. Piece size = " + message_payload.length);
-                                    System.out.println(getPiece(304).length);
-                                }
+                                if(!bitfield.get(index)) {
+                                    addPiece(index, message_payload);
+                                    Log.downloadingPiece(peerid, remoteID, index, fileHandler.numPiecesPeerHas());
 
 
-                                //send have message to other remote peers to update their bitfields of what we have
-                                for (Integer key : connections.keySet()) {
-                                    DataOutputStream out = new DataOutputStream(connections.get(key).getOutputStream());
-                                    byte[] haveMsg = messageHandler.getHaveMessage(index);
-                                    writeMessage(out, key, haveMsg);
+                                    //send have message to other remote peers to update their bitfields of what we have
+                                    for (Integer key : connections.keySet()) {
+                                        DataOutputStream out = new DataOutputStream(connections.get(key).getOutputStream());
+                                        byte[] haveMsg = messageHandler.getHaveMessage(index);
+                                        writeMessage(out, key, haveMsg);
+                                    }
                                 }
 
                                 // if no longer interested
@@ -600,6 +601,16 @@ public class Peer {
 
         public byte[] getPiece(int index){
             return fileHandler.getPiece(index);
+        }
+
+        public boolean alreadyHasPiece(int index){
+
+            if(bitfield.get(index)){
+                return true;
+            }else{
+                return false;
+            }
+
         }
 
         // TODO
@@ -900,13 +911,13 @@ public class Peer {
                     byte[] chokeMsg = messageHandler.getChokeMessage();
                     try {
 
-                        if (remotePeers.get(pid).isChoked()) {
+                        if (remotePeers.get(optUnchoked.getID()).isChoked()) {
                             System.out.println("rando: " + pid);
-                            DataOutputStream output = new DataOutputStream(connections.get(pid).getOutputStream());
+                            DataOutputStream output = new DataOutputStream(connections.get(optUnchoked.getID()).getOutputStream());
 
                             writeMessage(output, pid, chokeMsg);
-                            remotePeers.get(pid).choke();
-                            Log.choking(peerid, pid);
+                            remotePeers.get(optUnchoked.getID()).choke();
+                            Log.choking(peerid, optUnchoked.getID());
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -917,7 +928,9 @@ public class Peer {
                 byte[] unchokeMsg = messageHandler.getUnchokeMessage();
                 try {
 
-                    if (remotePeers.get(pid).isChoked()) {
+                    optUnchoked = remotePeers.get(pid);
+
+                    if (optUnchoked.isChoked()) {
                         System.out.println("rando: " + pid);
                         DataOutputStream output = new DataOutputStream(connections.get(pid).getOutputStream());
                         remotePeers.get(pid).unchoke();
@@ -935,6 +948,7 @@ public class Peer {
         int[] preferredNeighbors = new int[numberOfPreferredNeighbors];
         float min;
         int minPeer;
+        boolean changed = false;
 
         // Make list of all neighbors
         for(Integer id : peerTimes.keySet()) {
@@ -974,6 +988,7 @@ public class Peer {
                     output.write(unchokeMsg);
                     neighbor.unchoke();
                     Log.unchoking(peerid, neighbor.getID());
+                    changed = true;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -989,10 +1004,13 @@ public class Peer {
                 }
             }
         }
-        try{
-            Log.changePreferred(peerid, preferredNeighbors);
-        }catch(IOException e){
-            e.printStackTrace();
+        if(changed) {
+            try {
+                Log.changePreferred(peerid, preferredNeighbors);
+                changed = false;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
