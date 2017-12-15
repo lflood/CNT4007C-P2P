@@ -24,6 +24,7 @@ public class RemotePeer {
         this.choked = true;
         this.interested = false;
         this.bitfield = null;
+        this.chokingMe = true;
         bitfieldInitialized = false;
     }
     public int getID(){
@@ -48,10 +49,9 @@ public class RemotePeer {
         }
     }
 
-    public int getRandomPieceWanted(BitSet comparisonSet){
+    public int getRandomPieceWanted(BitSet comparisonSet, int numPieces){
 
         ArrayList<Integer> indexList = new ArrayList<>();
-        int numPieces = bitfield.size();
 
         for(int i = 0; i < numPieces; i++){
             if(bitfield.get(i) && !comparisonSet.get(i)){ // if piece is in remote peer and not calling peer, add to index list
@@ -61,9 +61,10 @@ public class RemotePeer {
 
         Random random = new Random();
 
-        int index = random.nextInt(indexList.size());
+        int listIndex = random.nextInt(indexList.size());
+        int pieceIndex = indexList.get(listIndex);
 
-        return index;
+        return pieceIndex;
     }
 
     public boolean hasBitfield(){
@@ -124,9 +125,6 @@ public class RemotePeer {
     }
     public void isNotInterestedMe(){
         interestedInMe = false;
-    }
-    public boolean amIInterested(){
-        return interestedInMe;
     }
 
     //interested variables for clients of other peers to access

@@ -42,7 +42,7 @@ public class Message {
 
 		int messageLength = 1;
 
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(0).array();
+		byte typeBytes = 0;
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
@@ -63,7 +63,7 @@ public class Message {
 
 		int messageLength = 1;
 
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(1).array();
+		byte typeBytes = 1;
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
@@ -84,7 +84,7 @@ public class Message {
 
 		int messageLength = 1;
 
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(2).array();
+		byte typeBytes = 2;
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
@@ -105,7 +105,7 @@ public class Message {
 
 		int messageLength = 1;
 
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(3).array();
+		byte typeBytes = 3;
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 
 		byte[] result = null;
@@ -126,7 +126,7 @@ public class Message {
 
 		int messageLength = 5;
 
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(4).array();
+		byte typeBytes = 4;
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 		byte[] indexBytes = ByteBuffer.allocate(4).putInt(index).array(); // TODO MAKE LEGIT
 
@@ -170,7 +170,7 @@ public class Message {
 
 		int messageLength = 5;
 
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(6).array();
+		byte typeBytes = 6;
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
 		byte[] indexBytes = ByteBuffer.allocate(4).putInt(index).array();;
 
@@ -193,7 +193,7 @@ public class Message {
 		int messageLength = 5;
 
 		byte[] lengthBytes = ByteBuffer.allocate(4).putInt(messageLength).array();
-		byte[] typeBytes = ByteBuffer.allocate(1).putInt(7).array();
+		byte typeBytes = 7;
 		byte[] indexBytes = ByteBuffer.allocate(4).putInt(index).array();
 		byte[] contentBytes = piece;
 
