@@ -24,6 +24,7 @@ public class RemotePeer {
         this.ID = ID;
         this.choked = true;
         this.interested = false;
+        this.interestedInMe = false;
         this.bitfield = null;
         this.chokingMe = true;
         bitfieldInitialized = false;
@@ -122,11 +123,15 @@ public class RemotePeer {
     }
 
     //interested variables for servers of other peers to access
-    public void isInterestedMe(){
-        interestedInMe = true;
+    public boolean isInterestedInMe(){
+        return interestedInMe;
     }
-    public void isNotInterestedMe(){
+    public void notInterestedInMe(){
         interestedInMe = false;
+    }
+
+    public void interestedInMe(){
+        interestedInMe = true;
     }
 
     //interested variables for clients of other peers to access

@@ -41,7 +41,7 @@ public class Peer {
     static int numPieces;
     static String hShkHeader;
 
-    private BitSet bitfield = new BitSet();
+    private BitSet bitfield;
     ClientHandler client;
     ServerHandler server;
     ConnectionHandler connectionHandler;
@@ -58,6 +58,7 @@ public class Peer {
         hShkHeader = "P2PFILESHARINGPROJ";
         numberOfExpectedPeers = totalPeers - peerNum;
         optUnchoked = null;
+        bitfield = new BitSet();
 
 
         remotePeers = new Hashtable<>();
@@ -408,9 +409,10 @@ public class Peer {
                                 break;
                             case 1:
                                 unchokeMe(remoteID, peerid);
-                                //TODO
-                                //byte[] requestMsg = messageHandler.getRequestMessage(index);
-                                //dOut.write(requestMsg);
+
+                                index = findNewPieceIndex(remoteID);
+                                byte[] requestMsg = messageHandler.getRequestMessage(index);
+                                writeMessage(dOut, remoteID, requestMsg);
                                 break;
                             case 2:
                                 System.out.println(peerid + ": reveived interested message from: " + remoteID);
@@ -444,6 +446,8 @@ public class Peer {
                                 neighbor = remotePeers.get(remoteID);
                                 BitSet initBitfield = BitSet.valueOf(message_payload);
                                 neighbor.initializeBitfield(initBitfield);
+                                System.out.println(initBitfield.toString());
+                                System.out.println(neighbor.getBitfield().toString());
                                 System.out.println("bitfield message received");
 
                                 // check if interested
@@ -522,7 +526,7 @@ public class Peer {
         //case functions
         public void interestedMe(int neighborID, int peerid){
             RemotePeer neighbor = remotePeers.get(neighborID);
-            neighbor.isInterestedMe();
+            neighbor.interestedInMe();
             //the neighbor that choked us will now save that we are choked
             try{
                 Log.interested(peerid, neighborID);
@@ -532,7 +536,7 @@ public class Peer {
         }
         public void notInterestedMe(int neighborID, int peerid) {
             RemotePeer neighbor = remotePeers.get(neighborID);
-            neighbor.isNotInterestedMe();
+            neighbor.notInterestedInMe();
             try {
                 Log.uninterested(peerid, neighborID);
             } catch (IOException e) {
@@ -815,7 +819,7 @@ public class Peer {
         ArrayList<Integer> keys = new ArrayList<>();
         for(Integer key : connections.keySet()){
             RemotePeer neighbor = remotePeers.get(key);
-            if(neighbor.isChoked() && neighbor.isInterested()){
+            if(neighbor.isChoked() && neighbor.isInterestedInMe()){
                 possibleOptimisticConnections.add(neighbor.getID());
             }
             keys.add(key);
