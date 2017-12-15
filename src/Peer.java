@@ -1,5 +1,3 @@
-import org.omg.Messaging.SYNC_WITH_TRANSPORT;
-
 import javax.xml.crypto.Data;
 import java.io.*;
 import java.lang.reflect.Array;
@@ -402,6 +400,9 @@ public class Peer {
                         byte message_type = dIn.readByte();
                         System.out.println(message_type);
                         byte[] message_payload;
+
+
+
                         switch (message_type) {
                             //if we need to send out a message in response spawn a new thread and pass the reply message to it. Let it call send on the outputstream and die!
                             case 0:
@@ -437,6 +438,7 @@ public class Peer {
                                         writeMessage(dOut, remoteID, msg);
                                     }
                                 }
+                                neighbor.updateBitfield(index);
                                 break;
                             case 5:
 
@@ -855,9 +857,8 @@ public class Peer {
                     if (remotePeers.get(pid).isChoked()) {
                         System.out.println("rando: " + pid);
                         DataOutputStream output = new DataOutputStream(connections.get(pid).getOutputStream());
-
-                        writeMessage(output, pid, unchokeMsg);
                         remotePeers.get(pid).unchoke();
+                        writeMessage(output, pid, unchokeMsg);
                         Log.changeOptimisticallyUnchokedNeighbor(peerid, pid);
                     }
                 } catch (IOException e) {

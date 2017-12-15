@@ -52,6 +52,10 @@ public class RemotePeer {
         }
     }
 
+    public void updateBitfield(int index){
+        bitfield.set(index);
+    }
+
     public int getRandomPieceWanted(BitSet comparisonSet, int numPieces){
 
         ArrayList<Integer> indexList = new ArrayList<>();
