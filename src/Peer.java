@@ -1,9 +1,13 @@
+import org.omg.Messaging.SYNC_WITH_TRANSPORT;
+
 import javax.xml.crypto.Data;
 import java.io.*;
+import java.lang.reflect.Array;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 
 public class Peer {
@@ -18,10 +22,13 @@ public class Peer {
     private int numberOfExpectedPeers;
     private Message messageHandler;
     private FileHandling fileHandler;
+    private RemotePeer optUnchoked;
+    private boolean timingTaken;
 
     private Hashtable<Integer, RemotePeer> remotePeers;
     private Hashtable<Integer, Socket> connections;
     private Hashtable<Integer, Boolean> blocked;
+    Hashtable<Integer, Float> peerTimes= new Hashtable<>();
 
     //Common.cfg contents
 
@@ -46,8 +53,11 @@ public class Peer {
         this.peerInfo = peerInfo;
         this.targNum = peerNum;
 
+        timingTaken = false;
+
         hShkHeader = "P2PFILESHARINGPROJ";
         numberOfExpectedPeers = totalPeers - peerNum;
+        optUnchoked = null;
 
 
         remotePeers = new Hashtable<>();
@@ -120,6 +130,8 @@ public class Peer {
         int expectedConnections;
         int totalConnections;
         ArrayList<String> peerInfo;
+        boolean timerStarted;
+        TimingHandler TH;
 
         public ConnectionHandler(int expectedConnections, int totalPeers, ArrayList<String> peerInfo){
 
@@ -136,6 +148,8 @@ public class Peer {
             this.expectedConnections = expectedConnections;
             this.totalConnections = totalPeers - 1;
             this.peerInfo = peerInfo;
+            timerStarted = false;
+            TH = new TimingHandler();
         }
 
         public void run(){
@@ -164,6 +178,11 @@ public class Peer {
                     InputHandler IH = new InputHandler(peerID);
                     IH.start();
 
+                    if(!timerStarted){
+                        timerStarted = true;
+                        TH.start();
+                    }
+
                     if(!bitfieldIsEmpty()){
 
                         sendBitfield(requestSocket);
@@ -176,6 +195,7 @@ public class Peer {
 
             // RECEIVING CONNECTIONS
             while(numConn < expectedConnections) {
+
                 try {
                     Socket newConnection = listener.accept();
                     numConn++;
@@ -193,6 +213,11 @@ public class Peer {
 
                     InputHandler IH = new InputHandler(newPeerID);
                     IH.start();
+
+                    if(!timerStarted){
+                        timerStarted = true;
+                        TH.start();
+                    }
 
                     if(!bitfieldIsEmpty()){
 
@@ -313,6 +338,35 @@ public class Peer {
         }
     }
 
+    private class TimingHandler extends Thread
+    {
+
+        TimingHandler(){
+
+        }
+
+        public void run() {
+
+            Timer optimisticUnchokingIntervalTimer = new Timer();
+            optimisticUnchokingIntervalTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    optimisticUnchokingInterval();
+                }
+            }, 0, getOptimisticUnchokingInterval() * 1000);
+
+            Timer unchokingIntervalTimer = new Timer();
+            unchokingIntervalTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    if(timingTaken) {
+                        unchokingInterval();
+                    }
+                }
+            }, 0, getUnchokingInterval() * 1000);
+        }
+    }
+
 /////////////////////////////
 
     private class InputHandler extends Thread
@@ -322,19 +376,14 @@ public class Peer {
         DataOutputStream dOut;
         boolean active;
         int remoteID;
+        long timestamp1;
+        long timestamp2;
 
         InputHandler(int remoteID){
             this.remoteID = remoteID;
             this.connection = connections.get(remoteID);
             active = true;
 
-            Timer optimisticUnchokingIntervalTimer = new Timer();
-            optimisticUnchokingIntervalTimer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    optimisticUnchokingInterval();
-                }
-            }, 0, getOptimisticUnchokingInterval() * 1000);
         }
 
         public void run() {
@@ -364,11 +413,12 @@ public class Peer {
                                 //dOut.write(requestMsg);
                                 break;
                             case 2:
-                                interestedMe(peerid, remoteID);
+                                System.out.println(peerid + ": reveived interested message from: " + remoteID);
+                                interestedMe(remoteID, peerid);
                                 System.out.println(peerid + ": Interested message from " + remoteID);
                                 break;
                             case 3:
-                                notInterestedMe(peerid, remoteID);
+                                notInterestedMe(remoteID, peerid);
                                 break;
                             case 4:
                                 index = dIn.readInt();
@@ -405,6 +455,7 @@ public class Peer {
                                 }
                                 break;
                             case 6:
+                                timestamp1 = System.currentTimeMillis(); // TODO check to make sure not overwritten
                                 //received a request message for a certain piece index
                                 index = dIn.readInt();
                                 //we have the piece contents below
@@ -449,10 +500,12 @@ public class Peer {
                                     byte[] msg = messageHandler.getRequestMessage(index);
                                     writeMessage(dOut, remoteID, msg);
                                 }
+                                timestamp2 = System.currentTimeMillis();
+                                calculateTimeDiff(remoteID);
                                 break;
                         }
                     }else{
-
+                        //System.out.println("NO INPUT");
                     }
                 }
             } catch(Exception e)
@@ -544,9 +597,36 @@ public class Peer {
             return false;
         }
 
-        public int findNewPieceIndex(int peerid){
+        public int findNewPieceIndex(int peerid) {
             RemotePeer neighbor = remotePeers.get(peerid);
             return neighbor.getRandomPieceWanted(bitfield, numPieces);
+        }
+
+        public long getTimeStamp1(){
+            return timestamp1;
+        }
+        public long getTimeStamp2(){
+            return timestamp2;
+        }
+
+        public Hashtable<Integer, Float> calculateTimeDiff(int remoteID){
+            ArrayList<Float> times = new ArrayList<Float>();
+            long time1 = getTimeStamp1();
+            long time2 = getTimeStamp2();
+            float difference = Math.abs(time2-time1);
+            times.add(difference);
+            float sum = 0;
+            for(Float time : times){
+                sum += time;
+            }
+            float avg = sum/times.size();
+            peerTimes.put(remoteID, avg);
+
+            if(!timingTaken){
+                timingTaken = true;
+            }
+
+            return peerTimes;
         }
     }
 
@@ -728,11 +808,9 @@ public class Peer {
         return optimisticUnchokingInterval;
     }
 
-    public void unchokingInterval(){
-
-    }
     public void optimisticUnchokingInterval(){
         System.out.println("finding optimistic peer to unchoke");
+
         ArrayList<Integer> possibleOptimisticConnections = new ArrayList<Integer>();
         ArrayList<Integer> keys = new ArrayList<>();
         for(Integer key : connections.keySet()){
@@ -743,25 +821,111 @@ public class Peer {
             keys.add(key);
         }
         Random rando = new Random();
-        if(possibleOptimisticConnections.size() > 0){
+        if(possibleOptimisticConnections.size() > 0) {
             int randoChosenOne = rando.nextInt(possibleOptimisticConnections.size());
             int pid = possibleOptimisticConnections.get(randoChosenOne);
-            //SEND UNCHOKE MESSAGE
-            byte [] unchokeMsg = messageHandler.getUnchokeMessage();
-            try{
-                System.out.println("rando: " + pid);
-                DataOutputStream output = new DataOutputStream(connections.get(pid).getOutputStream());
 
-                blockPeerInput(pid);
-                output.write(unchokeMsg);
-                unblockPeerInput(pid);
-                remotePeers.get(pid).unchoke();
-                Log.changeOptimisticallyUnchokedNeighbor(peerid, pid);
-            }catch(IOException e){
-                e.printStackTrace();
+            if (optUnchoked == null || pid != optUnchoked.getID()) {
+
+                if(optUnchoked != null){
+                    byte[] chokeMsg = messageHandler.getChokeMessage();
+                    try {
+
+                        if (remotePeers.get(pid).isChoked()) {
+                            System.out.println("rando: " + pid);
+                            DataOutputStream output = new DataOutputStream(connections.get(pid).getOutputStream());
+
+                            writeMessage(output, pid, chokeMsg);
+                            remotePeers.get(pid).choke();
+                            Log.choking(peerid, pid);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                //SEND UNCHOKE MESSAGE
+                byte[] unchokeMsg = messageHandler.getUnchokeMessage();
+                try {
+
+                    if (remotePeers.get(pid).isChoked()) {
+                        System.out.println("rando: " + pid);
+                        DataOutputStream output = new DataOutputStream(connections.get(pid).getOutputStream());
+
+                        writeMessage(output, pid, unchokeMsg);
+                        remotePeers.get(pid).unchoke();
+                        Log.changeOptimisticallyUnchokedNeighbor(peerid, pid);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
+
+    public void unchokingInterval(){
+        int[] preferredNeighbors = new int[numberOfPreferredNeighbors];
+        float min = Integer.MAX_VALUE;
+        int minPeer;
+
+        // Make list of all neighbors
+        for(Integer id : peerTimes.keySet()) {
+            remotePeers.get(id).notPreferred();
+        }
+        for(int i = 0; i < numberOfPreferredNeighbors; i++){
+
+            minPeer = 1001;
+            min = Integer.MAX_VALUE;
+
+            for(Integer id : peerTimes.keySet()){
+
+                float time = peerTimes.get(id);
+
+                RemotePeer neighbor = remotePeers.get(id);
+
+                if (time < min && !neighbor.isPreferred()) {
+                    min = time;
+                    minPeer = neighbor.getID();
+                }
+            }
+            preferredNeighbors[i] = minPeer;
+
+            remotePeers.get(minPeer).preferred();
+        }
+
+        //if peer is interested and choked and preferred
+        //send unchoke message to them
+
+        for (RemotePeer neighbor : remotePeers.values()) {
+            if (neighbor.isPreferred() && neighbor.isChoked()) {
+                byte[] unchokeMsg = messageHandler.getUnchokeMessage();
+                try {
+                    DataOutputStream output = new DataOutputStream(connections.get(neighbor.getID()).getOutputStream());
+                    output.write(unchokeMsg);
+                    neighbor.unchoke();
+                    Log.unchoking(peerid, neighbor.getID());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else if(!neighbor.isPreferred() && !neighbor.isChoked()){
+                try {
+                    byte[] chokeMsg = messageHandler.getChokeMessage();
+                    DataOutputStream output = new DataOutputStream(connections.get(neighbor.getID()).getOutputStream());
+                    output.write(chokeMsg);
+                    neighbor.choke();
+                    Log.choking(peerid, neighbor.getID());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        try{
+            Log.changePreferred(peerid, preferredNeighbors);
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+
     public void ALLDONE(){
         fileHandler.writeFile();
     }
